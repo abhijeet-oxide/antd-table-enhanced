@@ -1,6 +1,6 @@
 {
   "name": "antd-table-enhanced",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A drop-in enhanced Ant Design Table with resizable, reorderable, and persistent columns.",
   "license": "MIT",
   "author": "Abhijeet Prasad <abhijeetoxide@gmail.com>",

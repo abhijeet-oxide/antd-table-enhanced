@@ -6,14 +6,6 @@ import { libInjectCss } from "vite-plugin-lib-inject-css";
 export default defineConfig({
   plugins: [
     react(),
-
-    /**
-     * Automatically injects the generated CSS into the library entry.
-     *
-     * Consumers only need:
-     *
-     * import { Table } from "antd-table-enhanced";
-     */
     libInjectCss(),
 
     dts({
