@@ -1,0 +1,9 @@
+node_modules
+src
+.vscode
+.idea
+.DS_Store
+*.log
+pnpm-lock.yaml
+vite.config.ts
+tsconfig.json

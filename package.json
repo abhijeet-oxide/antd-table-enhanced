@@ -1,0 +1,63 @@
+{
+  "name": "antd-table-enhanced",
+  "version": "0.1.0",
+  "description": "An enhanced Ant Design Table with column resizing, column reordering, and persisted layout preferences.",
+  "license": "MIT",
+  "author": "Your Name",
+  "type": "module",
+  "main": "./dist/antd-table-enhanced.cjs",
+  "module": "./dist/antd-table-enhanced.js",
+  "types": "./dist/index.d.ts",
+  "style": "./dist/style.css",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/antd-table-enhanced.js",
+      "require": "./dist/antd-table-enhanced.cjs"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "sideEffects": [
+    "**/*.css",
+    "**/*.less"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm typecheck && pnpm build"
+  },
+  "peerDependencies": {
+    "@ant-design/icons": "^5.0.0",
+    "antd": "^5.0.0",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^5.0.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "^4.0.0",
+    "antd": "^5.0.0",
+    "less": "^4.2.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^4.0.0",
+    "vite-plugin-lib-inject-css": "^2.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "18.3.12",
+      "@types/react-dom": "18.3.1",
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    }
+  }
+}
