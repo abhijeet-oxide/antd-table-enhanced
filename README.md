@@ -34,6 +34,40 @@ Explore usage examples:
 
 **[Examples](https://abhijeet-oxide.github.io/antd-table-enhanced/)**
 
+## Sample
+
+<div align="center">
+  <figure>
+    <img
+      src="./examples/demo/assets/resize.png"
+      alt="Resizable columns demo"
+      width="800"
+      style="max-width: 100%; border-radius: 12px;"
+    />
+    <figcaption>
+      <strong>Resizable Columns</strong><br />
+      Drag column edges to resize table columns and preserve the adjusted layout.
+    </figcaption>
+  </figure>
+</div>
+
+<br />
+
+<div align="center">
+  <figure>
+    <img
+      src="./examples/demo/assets/reorder.png"
+      alt="Reorderable columns demo"
+      width="800"
+      style="max-width: 100%; border-radius: 12px;"
+    />
+    <figcaption>
+      <strong>Reorderable Columns</strong><br />
+      Drag column headers to reorder columns and keep the customized layout.
+    </figcaption>
+  </figure>
+</div>
+
 ---
 
 ## Overview

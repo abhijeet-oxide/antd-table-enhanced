@@ -83,6 +83,9 @@ const STORAGE_PREFIX = "antd-table-enhanced";
 const STORAGE_WRITE_DEBOUNCE_MS = 240;
 
 let activeDragColumnKey: string | null = null;
+let activeDragColumnLabel: string | null = null;
+
+const REORDER_TOOLTIP_CLASS = "antd-table-enhanced-reorder-tooltip";
 
 function canUseDOM() {
   return typeof window !== "undefined" && typeof document !== "undefined";
@@ -275,6 +278,85 @@ function getTitleSignature(title: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+function reactNodeToPlainText(node: React.ReactNode): string | undefined {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    const text = node
+      .map((child) => reactNodeToPlainText(child))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    return text || undefined;
+  }
+
+  if (React.isValidElement(node)) {
+    return reactNodeToPlainText((node.props as any)?.children);
+  }
+
+  return undefined;
+}
+
+function getColumnDisplayLabel(
+  columnKey: string,
+  columnTitle?: React.ReactNode,
+): string {
+  return reactNodeToPlainText(columnTitle)?.trim() || columnKey;
+}
+
+function getDragColumnLabelFromEvent(
+  event: React.DragEvent,
+  fallback?: string,
+): string {
+  return (
+    event.dataTransfer.getData(
+      "application/x-antd-table-enhanced-column-label",
+    ) ||
+    activeDragColumnLabel ||
+    fallback ||
+    "column"
+  );
+}
+
+function buildReorderTooltipText(options: {
+  draggedColumnKey?: string | null;
+  draggedColumnLabel: string;
+  targetColumnKey: string;
+  targetColumnLabel: string;
+  previousColumnKey?: string;
+  previousColumnLabel?: string;
+  side: DropSide;
+}) {
+  const {
+    draggedColumnKey,
+    draggedColumnLabel,
+    targetColumnKey,
+    targetColumnLabel,
+    previousColumnKey,
+    previousColumnLabel,
+    side,
+  } = options;
+
+  const columnBeforeKey =
+    side === "right" ? targetColumnKey : previousColumnKey;
+
+  const columnBeforeLabel =
+    side === "right" ? targetColumnLabel : previousColumnLabel;
+
+  if (
+    columnBeforeLabel &&
+    columnBeforeKey &&
+    columnBeforeKey !== draggedColumnKey
+  ) {
+    return `Place ${draggedColumnLabel} after ${columnBeforeLabel}`;
+  }
+
+  return `Place ${draggedColumnLabel} before ${targetColumnLabel}`;
 }
 
 function getColumnKey<RecordType>(
@@ -501,11 +583,20 @@ function estimateScrollX<RecordType>(
 
 type EnhancedTitleProps = {
   columnKey: string;
+  columnLabel: string;
   reorderEnabled: boolean;
   controlsEnabled: boolean;
   debug?: boolean;
   children: React.ReactNode;
 };
+
+function removeReorderTooltips() {
+  if (!canUseDOM()) return;
+
+  document.querySelectorAll(`.${REORDER_TOOLTIP_CLASS}`).forEach((tooltip) => {
+    tooltip.remove();
+  });
+}
 
 function removeReorderGuides() {
   if (!canUseDOM()) return;
@@ -513,10 +604,49 @@ function removeReorderGuides() {
   document.querySelectorAll(`.${s.reorderGuide}`).forEach((guide) => {
     guide.remove();
   });
+
+  removeReorderTooltips();
+}
+
+function createReorderTooltip() {
+  if (!canUseDOM()) return undefined;
+
+  removeReorderTooltips();
+
+  const tooltip = document.createElement("div");
+  tooltip.className = cx(REORDER_TOOLTIP_CLASS, s.reorderTooltip);
+
+  tooltip.style.position = "fixed";
+  tooltip.style.zIndex = "99999";
+  tooltip.style.pointerEvents = "none";
+  tooltip.style.padding = "6px 10px";
+  tooltip.style.borderRadius = "6px";
+  tooltip.style.background = "rgba(0, 0, 0, 0.82)";
+  tooltip.style.color = "#fff";
+  tooltip.style.fontSize = "12px";
+  tooltip.style.lineHeight = "18px";
+  tooltip.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.22)";
+  tooltip.style.whiteSpace = "nowrap";
+  tooltip.style.transform = "translate(-9999px, -9999px)";
+
+  document.body.appendChild(tooltip);
+
+  return {
+    setText(text: string) {
+      tooltip.textContent = text;
+    },
+    setPosition(x: number, y: number) {
+      tooltip.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
+    },
+    remove() {
+      tooltip.remove();
+    },
+  };
 }
 
 const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
   columnKey,
+  columnLabel,
   reorderEnabled,
   controlsEnabled,
   debug,
@@ -530,7 +660,9 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
     event.stopPropagation();
 
     removeReorderGuides();
+
     activeDragColumnKey = columnKey;
+    activeDragColumnLabel = columnLabel;
 
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", columnKey);
@@ -538,14 +670,23 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
       "application/x-antd-table-enhanced-column",
       columnKey,
     );
+    event.dataTransfer.setData(
+      "application/x-antd-table-enhanced-column-label",
+      columnLabel,
+    );
 
-    debugLog(debug, "Drag start", { fromColumnKey: columnKey });
+    debugLog(debug, "Drag start", {
+      fromColumnKey: columnKey,
+      fromColumnLabel: columnLabel,
+    });
   };
 
   const handleDragEnd = () => {
     debugLog(debug, "Drag end", { columnKey });
 
     activeDragColumnKey = null;
+    activeDragColumnLabel = null;
+
     removeReorderGuides();
   };
 
@@ -567,7 +708,7 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
             className={cx(s.control, s.dragButton)}
             icon={<HolderOutlined />}
             draggable
-            aria-label={`Drag to reorder column ${columnKey}`}
+            aria-label={`Drag to reorder column ${columnLabel}`}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onClick={(event) => {
@@ -594,6 +735,9 @@ type HeaderContextMenuPayload = {
 type HeaderCellProps = React.ThHTMLAttributes<HTMLTableCellElement> & {
   enhancedColumnKey?: string;
   enhancedColumnTitle?: React.ReactNode;
+  enhancedColumnLabel?: string;
+  enhancedPreviousColumnKey?: string;
+  enhancedPreviousColumnLabel?: string;
   enhancedWidth?: number;
   enhancedResizeEnabled?: boolean;
   enhancedReorderEnabled?: boolean;
@@ -671,6 +815,9 @@ function createHeaderCell(ExistingHeaderCell?: any) {
     const {
       enhancedColumnKey,
       enhancedColumnTitle,
+      enhancedColumnLabel,
+      enhancedPreviousColumnKey,
+      enhancedPreviousColumnLabel,
       enhancedWidth,
       enhancedResizeEnabled,
       enhancedReorderEnabled,
@@ -711,11 +858,20 @@ function createHeaderCell(ExistingHeaderCell?: any) {
       typeof createReorderGuide
     > | null>(null);
 
+    const reorderTooltipRef = React.useRef<ReturnType<
+      typeof createReorderTooltip
+    > | null>(null);
+
     const controlsEnabled = enhancedShowColumnControls !== "off";
 
     const cleanupReorderGuide = React.useCallback(() => {
       reorderGuideRef.current?.remove();
       reorderGuideRef.current = null;
+
+      reorderTooltipRef.current?.remove();
+      reorderTooltipRef.current = null;
+
+      removeReorderTooltips();
     }, []);
 
     React.useEffect(() => {
@@ -909,11 +1065,43 @@ function createHeaderCell(ExistingHeaderCell?: any) {
 
       reorderGuideRef.current?.setX(guideX);
 
+      const draggedColumnLabel = getDragColumnLabelFromEvent(
+        event,
+        fromColumnKey || undefined,
+      );
+
+      const targetColumnLabel =
+        enhancedColumnLabel ||
+        getColumnDisplayLabel(enhancedColumnKey, enhancedColumnTitle);
+
+      const tooltipText = buildReorderTooltipText({
+        draggedColumnKey: fromColumnKey,
+        draggedColumnLabel,
+        targetColumnKey: enhancedColumnKey,
+        targetColumnLabel,
+        previousColumnKey: enhancedPreviousColumnKey,
+        previousColumnLabel: enhancedPreviousColumnLabel,
+        side,
+      });
+
+      if (!reorderTooltipRef.current) {
+        reorderTooltipRef.current = createReorderTooltip();
+      }
+
+      reorderTooltipRef.current?.setText(tooltipText);
+      reorderTooltipRef.current?.setPosition(event.clientX, event.clientY);
+
       event.dataTransfer.dropEffect = "move";
     };
 
     const handleDragLeave = (event: React.DragEvent<HTMLTableCellElement>) => {
       onDragLeave?.(event);
+
+      const nextTarget = event.relatedTarget as Node | null;
+
+      if (nextTarget && event.currentTarget.contains(nextTarget)) {
+        return;
+      }
 
       setDragOverSide(null);
       cleanupReorderGuide();
@@ -921,6 +1109,9 @@ function createHeaderCell(ExistingHeaderCell?: any) {
 
     const handleDragEnd = (event: React.DragEvent<HTMLTableCellElement>) => {
       onDragEnd?.(event);
+
+      activeDragColumnKey = null;
+      activeDragColumnLabel = null;
 
       setDragOverSide(null);
       cleanupReorderGuide();
@@ -957,7 +1148,9 @@ function createHeaderCell(ExistingHeaderCell?: any) {
       setDragOverSide(null);
       cleanupReorderGuide();
       removeReorderGuides();
+
       activeDragColumnKey = null;
+      activeDragColumnLabel = null;
 
       debugLog(enhancedDebug, "Drop", {
         fromColumnKey,
@@ -1172,6 +1365,22 @@ function decorateColumns<RecordType extends AnyRecord>(
     const currentIndexPath = [...indexPath, index];
     const columnKey = getColumnKey(column, currentIndexPath);
 
+    const previousColumn =
+      topLevel && index > 0 ? columns[index - 1] : undefined;
+
+    const previousColumnKey = previousColumn
+      ? getColumnKey(previousColumn, [...indexPath, index - 1])
+      : undefined;
+
+    const previousColumnLabel = previousColumn
+      ? getColumnDisplayLabel(
+          previousColumnKey as string,
+          typeof previousColumn.title === "function"
+            ? undefined
+            : previousColumn.title,
+        )
+      : undefined;
+
     const existingOnHeaderCell = column.onHeaderCell;
     const hasChildren =
       Array.isArray(column.children) && column.children.length > 0;
@@ -1191,6 +1400,11 @@ function decorateColumns<RecordType extends AnyRecord>(
 
     const originalTitle = column.title;
 
+    const staticColumnLabel = getColumnDisplayLabel(
+      columnKey,
+      typeof originalTitle === "function" ? undefined : originalTitle,
+    );
+
     const renderTitle = (titleProps?: any) => {
       const node =
         typeof originalTitle === "function"
@@ -1200,6 +1414,7 @@ function decorateColumns<RecordType extends AnyRecord>(
       return (
         <EnhancedTitle
           columnKey={columnKey}
+          columnLabel={getColumnDisplayLabel(columnKey, node)}
           reorderEnabled={reorderEnabled}
           controlsEnabled={showColumnControls !== "off"}
           debug={debug}
@@ -1225,6 +1440,9 @@ function decorateColumns<RecordType extends AnyRecord>(
           enhancedColumnKey: columnKey,
           enhancedColumnTitle:
             typeof originalTitle === "function" ? undefined : originalTitle,
+          enhancedColumnLabel: staticColumnLabel,
+          enhancedPreviousColumnKey: previousColumnKey,
+          enhancedPreviousColumnLabel: previousColumnLabel,
           enhancedWidth: finalWidth,
           enhancedResizeEnabled: resizeEnabled,
           enhancedReorderEnabled: reorderEnabled,

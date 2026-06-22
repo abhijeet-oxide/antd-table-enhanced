@@ -2,6 +2,8 @@ import {
   CheckOutlined,
   CodeOutlined,
   CopyOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   GithubOutlined,
 } from "@ant-design/icons";
 import {
@@ -15,7 +17,7 @@ import {
   Typography,
 } from "antd";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import npmLogo from "../assets/npm.svg";
 
@@ -135,10 +137,56 @@ function DemoCard({
   code: string;
 }) {
   const [showCode, setShowCode] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen]);
 
   return (
-    <Card id={id} className="demo-card" styles={{ body: { padding: 0 } }}>
-      <div className="demo-preview">{children}</div>
+    <Card
+      id={id}
+      className={`demo-card ${isFullscreen ? "demo-card-fullscreen" : ""}`}
+      styles={{ body: { padding: 0 } }}
+    >
+      <div className="demo-preview">
+        <div className="demo-preview-toolbar">
+          <Tooltip title={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}>
+            <Button
+              type="text"
+              size="small"
+              className="demo-fullscreen-button"
+              icon={
+                isFullscreen ? (
+                  <FullscreenExitOutlined />
+                ) : (
+                  <FullscreenOutlined />
+                )
+              }
+              onClick={() => setIsFullscreen((value) => !value)}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+            />
+          </Tooltip>
+        </div>
+
+        <div className="demo-preview-content">{children}</div>
+      </div>
 
       <Divider className="demo-divider" />
 
@@ -336,7 +384,8 @@ export default function App() {
 
                 <Paragraph>
                   Try resizing columns, dragging columns to reorder them,
-                  refreshing the page, and resetting the saved layout.
+                  refreshing the page, resetting the saved layout, or opening
+                  each example in fullscreen mode.
                 </Paragraph>
               </div>
 
