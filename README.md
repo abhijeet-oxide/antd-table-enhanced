@@ -11,7 +11,7 @@
 
 A drop-in enhanced Ant Design Table with resizable, reorderable, and remembered columns.
 
-I’ve been using Ant Design for a long time, and honestly — it’s awesome.
+I’ve been using Ant Design for a long time, and it’s awesome.
 
 But one thing always bugged me:
 
