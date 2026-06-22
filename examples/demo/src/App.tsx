@@ -1,4 +1,5 @@
-import { GithubOutlined, NpmOutlined } from "@ant-design/icons";
+import { GithubOutlined } from "@ant-design/icons";
+
 import { Button, Card, Layout, Space, Tabs, Typography } from "antd";
 
 import BasicExample from "./examples/BasicExample";
@@ -117,7 +118,12 @@ export default function App() {
           </Button>
 
           <Button
-            icon={<NpmOutlined />}
+            icon={
+              <img
+                src="https://www.npmjs.com/static/images/touch-icons/favicon-32x32.png"
+                alt="npm"
+              />
+            }
             href="https://www.npmjs.com/package/antd-table-enhanced"
             target="_blank"
             type="primary"
