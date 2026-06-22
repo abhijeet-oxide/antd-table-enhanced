@@ -1,76 +1,119 @@
+<div align="center">
+
 # antd-table-enhanced
 
+A drop-in enhanced Ant Design Table with resizable, reorderable, and remembered columns.
+
+[Live Demo](https://abhijeet-oxide.github.io/antd-table-enhanced/) ·
+[Examples](https://abhijeet-oxide.github.io/antd-table-enhanced/) ·
+[npm](https://www.npmjs.com/package/antd-table-enhanced) ·
+[GitHub](https://github.com/abhijeet-oxide/antd-table-enhanced)
+
+</div>
+
+<div align="center">
+
 [![Publish to NPM](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/publish.yml/badge.svg)](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/publish.yml)
+[![Deploy Demo](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/pages.yml/badge.svg)](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/pages.yml)
 [![npm version](https://img.shields.io/npm/v/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
 [![npm downloads](https://img.shields.io/npm/dm/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
 [![license](https://img.shields.io/npm/l/antd-table-enhanced.svg)](./LICENSE)
 [![Ant Design](https://img.shields.io/badge/Ant%20Design-5.x-1677ff.svg)](https://ant.design/)
 
-A drop-in enhanced Ant Design Table with resizable, reorderable, and remembered columns.
-
-I’ve been using Ant Design for a long time, and it’s awesome.
-
-But one thing always bugged me:
-
-> Why can’t the Table columns be resized and reordered out of the box?
-
-Ant Design has examples for this, but they usually require custom setup, extra wiring, and some rework every time you want to use them.
-
-I wanted something simpler.
-
-A clean drop-in replacement for AntD `Table` that lets users:
-
-- resize columns
-- reorder columns
-- keep their layout after refresh
-- Ability to reset preffernces
-- continue using the Ant Design Table API they already know
-
-That’s what `antd-table-enhanced` does.
+</div>
 
 ---
 
-## Install
+## Demo
 
-```bash
-pnpm add antd-table-enhanced
-```
+Try the package in your browser:
 
-or:
+**[Live Demo](https://abhijeet-oxide.github.io/antd-table-enhanced/)**
 
-```bash
-npm install antd-table-enhanced
-```
+Explore usage examples:
 
-You should already have these in your app:
-
-```bash
-pnpm add antd @ant-design/icons react react-dom
-```
+**[Examples](https://abhijeet-oxide.github.io/antd-table-enhanced/)**
 
 ---
 
-## Usage
+## Overview
 
-Instead of this:
+`antd-table-enhanced` extends Ant Design's `Table` with practical column interaction features commonly needed in modern data-heavy applications.
 
-```tsx
-import { Table } from "antd";
-```
+It adds:
 
-use this:
+- Resizable columns
+- Reorderable columns
+- Persisted column width and order
+- Resettable table layout
+- Per-column resize/reorder controls
+- Compatibility with the Ant Design `Table` API
+
+It is designed to work as a drop-in replacement for Ant Design's table component.
 
 ```tsx
 import { Table } from "antd-table-enhanced";
 ```
 
-That’s it.
+---
 
-No separate style import needed.
+## Features
+
+| Feature               | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| Resizable columns     | Users can resize columns directly from the table header    |
+| Reorderable columns   | Users can drag columns to change their order               |
+| Remembered layout     | Column width and order can persist across page refreshes   |
+| Reset layout          | Expose a reset action to restore the default column layout |
+| AntD compatible       | Continue using standard Ant Design `Table` props           |
+| Per-column control    | Disable resizing or reordering for individual columns      |
+| No extra style import | No separate package stylesheet import required             |
 
 ---
 
-## Basic example
+## Installation
+
+Using pnpm:
+
+```bash
+pnpm add antd-table-enhanced
+```
+
+Using npm:
+
+```bash
+npm install antd-table-enhanced
+```
+
+Using yarn:
+
+```bash
+yarn add antd-table-enhanced
+```
+
+Required peer dependencies:
+
+```bash
+pnpm add react react-dom antd @ant-design/icons
+```
+
+---
+
+## Quick Start
+
+Replace this:
+
+```tsx
+import { Table } from "antd";
+```
+
+With this:
+
+```tsx
+import { Table } from "antd-table-enhanced";
+```
+
+Then use it like a standard Ant Design table.
 
 ```tsx
 import { Table } from "antd-table-enhanced";
@@ -125,35 +168,65 @@ export default function UsersTable() {
 
 ---
 
-## What you get
+## Basic Example
 
-### Resize columns
+```tsx
+import { Table } from "antd-table-enhanced";
 
-Users can drag the column edge to resize.
+const columns = [
+  {
+    title: "Name",
+    dataIndex: "name",
+    key: "name",
+    width: 220,
+  },
+  {
+    title: "Email",
+    dataIndex: "email",
+    key: "email",
+    width: 300,
+  },
+  {
+    title: "Status",
+    dataIndex: "status",
+    key: "status",
+    width: 160,
+  },
+];
 
-No extra setup.
+const data = [
+  {
+    id: 1,
+    name: "Jane Doe",
+    email: "jane@example.com",
+    status: "Active",
+  },
+  {
+    id: 2,
+    name: "John Smith",
+    email: "john@example.com",
+    status: "Inactive",
+  },
+];
+
+export default function Example() {
+  return (
+    <Table
+      tableEnhancedKey="basic-users-table"
+      rowKey="id"
+      columns={columns}
+      dataSource={data}
+      pagination={false}
+    />
+  );
+}
+```
 
 ---
 
-### Reorder columns
+## Column Keys
 
-Users can drag columns and move them around.
-
-Also no extra setup.
-
----
-
-### It remembers
-
-Column widths and order are saved automatically.
-
-So if the user refreshes the page, their table layout stays the same.
-
----
-
-## Important: add column keys
-
-For best results, give every column a stable `key`.
+For best results, every column should have a stable `key`.
 
 ```tsx
 const columns = [
@@ -170,19 +243,19 @@ const columns = [
 ];
 ```
 
-The `key` is used to remember column width and order.
+The column `key` is used to identify columns when saving and restoring layout state.
 
 ---
 
-## Use a unique table key
+## Table Layout Persistence
 
-Add `tableEnhancedKey` to each table:
+Use `tableEnhancedKey` to uniquely identify each enhanced table.
 
 ```tsx
 <Table tableEnhancedKey="users-table" columns={columns} dataSource={data} />
 ```
 
-If you have multiple tables, use different keys:
+If your application has multiple tables, use a different key for each table.
 
 ```tsx
 <Table tableEnhancedKey="users-table" />
@@ -190,53 +263,61 @@ If you have multiple tables, use different keys:
 <Table tableEnhancedKey="products-table" />
 ```
 
----
-
-## Disable resizing or reordering
-
-Disable resizing for the whole table:
-
-```tsx
-<Table enableColumnResize={false} />
-```
-
-Disable reordering for the whole table:
-
-```tsx
-<Table enableColumnReorder={false} />
-```
-
-Disable both for a specific column:
-
-```tsx
-const columns = [
-  {
-    title: "Actions",
-    key: "actions",
-    disableResize: true,
-    disableReorder: true,
-    render: () => <button>View</button>,
-  },
-];
-```
+This prevents layout preferences from one table affecting another.
 
 ---
 
-## Reset layout
+## Reset Layout
 
-You can reset saved column width/order using `tableEnhancedActionsRef`.
+Use `tableEnhancedActionsRef` to access enhanced table actions such as resetting the saved column layout.
 
 ```tsx
 import { useRef } from "react";
-import { Button } from "antd";
+import { Button, Space } from "antd";
 import { Table } from "antd-table-enhanced";
 import type { TableEnhancedActions } from "antd-table-enhanced";
+
+const columns = [
+  {
+    title: "Name",
+    dataIndex: "name",
+    key: "name",
+    width: 220,
+  },
+  {
+    title: "Email",
+    dataIndex: "email",
+    key: "email",
+    width: 300,
+  },
+  {
+    title: "Role",
+    dataIndex: "role",
+    key: "role",
+    width: 180,
+  },
+];
+
+const data = [
+  {
+    id: 1,
+    name: "Jane Doe",
+    email: "jane@example.com",
+    role: "Admin",
+  },
+  {
+    id: 2,
+    name: "John Smith",
+    email: "john@example.com",
+    role: "User",
+  },
+];
 
 export default function UsersTable() {
   const actionsRef = useRef<TableEnhancedActions | null>(null);
 
   return (
-    <>
+    <Space direction="vertical" size="middle" style={{ width: "100%" }}>
       <Button onClick={() => actionsRef.current?.resetLayout()}>
         Reset layout
       </Button>
@@ -248,51 +329,316 @@ export default function UsersTable() {
         columns={columns}
         dataSource={data}
       />
-    </>
+    </Space>
   );
 }
 ```
 
 ---
 
-## Props added by this package
+## Disable Column Resizing
 
-You can still use normal AntD `Table` props.
+Disable resizing for the entire table:
 
-This package adds a few extra ones:
+```tsx
+<Table
+  tableEnhancedKey="users-table"
+  enableColumnResize={false}
+  columns={columns}
+  dataSource={data}
+/>
+```
 
-| Prop                      | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `tableEnhancedKey`        | Unique key used to remember table layout |
-| `enableColumnResize`      | Enable/disable column resizing           |
-| `enableColumnReorder`     | Enable/disable column reordering         |
-| `tableEnhancedActionsRef` | Access reset/layout actions              |
-| `minColumnWidth`          | Minimum resize width                     |
-| `defaultColumnWidth`      | Default width for columns without width  |
-| `showColumnControls`      | Show controls on hover, always, or off   |
+Disable resizing for a specific column:
+
+```tsx
+const columns = [
+  {
+    title: "Actions",
+    key: "actions",
+    disableResize: true,
+    render: () => <button>View</button>,
+  },
+];
+```
 
 ---
 
-## Why use this?
+## Disable Column Reordering
 
-Because sometimes you just want Ant Design Table, but with the missing table UX:
+Disable reordering for the entire table:
 
-- resize columns
-- reorder columns
-- remember preferences
-- keep your existing AntD-style code
+```tsx
+<Table
+  tableEnhancedKey="users-table"
+  enableColumnReorder={false}
+  columns={columns}
+  dataSource={data}
+/>
+```
 
-No complicated setup.  
-No copy-pasting large examples.  
-No rebuilding the same table behavior again.
+Disable reordering for a specific column:
 
-Just:
+```tsx
+const columns = [
+  {
+    title: "Actions",
+    key: "actions",
+    disableReorder: true,
+    render: () => <button>View</button>,
+  },
+];
+```
+
+---
+
+## Disable Resize and Reorder for a Column
+
+This is useful for action columns or columns that should remain fixed in behavior.
+
+```tsx
+const columns = [
+  {
+    title: "Actions",
+    key: "actions",
+    width: 120,
+    disableResize: true,
+    disableReorder: true,
+    render: () => <button>View</button>,
+  },
+];
+```
+
+---
+
+## API
+
+`antd-table-enhanced` supports standard Ant Design `Table` props and adds the following enhanced props.
+
+| Prop                      | Type                                      | Default         | Description                                  |
+| ------------------------- | ----------------------------------------- | --------------- | -------------------------------------------- |
+| `tableEnhancedKey`        | `string`                                  | `undefined`     | Unique key used to persist table layout      |
+| `enableColumnResize`      | `boolean`                                 | `true`          | Enables or disables column resizing          |
+| `enableColumnReorder`     | `boolean`                                 | `true`          | Enables or disables column reordering        |
+| `tableEnhancedActionsRef` | `RefObject<TableEnhancedActions \| null>` | `undefined`     | Ref for accessing enhanced table actions     |
+| `minColumnWidth`          | `number`                                  | Package default | Minimum width allowed while resizing         |
+| `defaultColumnWidth`      | `number`                                  | Package default | Width used when a column does not define one |
+| `showColumnControls`      | `"hover" \| "always" \| "never"`          | Package default | Controls visibility of column interaction UI |
+
+---
+
+## Column Options
+
+In addition to standard Ant Design column configuration, columns can use the following options.
+
+| Option           | Type      | Description                             |
+| ---------------- | --------- | --------------------------------------- |
+| `disableResize`  | `boolean` | Disables resizing for the column        |
+| `disableReorder` | `boolean` | Disables drag reordering for the column |
+
+Example:
+
+```tsx
+const columns = [
+  {
+    title: "Actions",
+    key: "actions",
+    width: 120,
+    disableResize: true,
+    disableReorder: true,
+    render: () => <button>View</button>,
+  },
+];
+```
+
+---
+
+## TypeScript
+
+The package includes TypeScript support.
+
+```tsx
+import type { TableEnhancedActions } from "antd-table-enhanced";
+```
+
+Example:
+
+```tsx
+import { useRef } from "react";
+import type { TableEnhancedActions } from "antd-table-enhanced";
+
+const actionsRef = useRef<TableEnhancedActions | null>(null);
+```
+
+---
+
+## Migration from Ant Design Table
+
+Most existing Ant Design tables can be migrated by changing the import.
+
+Before:
+
+```tsx
+import { Table } from "antd";
+```
+
+After:
 
 ```tsx
 import { Table } from "antd-table-enhanced";
 ```
 
-and move on.
+Recommended additions:
+
+```tsx
+<Table
+  tableEnhancedKey="users-table"
+  rowKey="id"
+  columns={columns}
+  dataSource={data}
+/>
+```
+
+For reliable persistence:
+
+1. Add a unique `tableEnhancedKey`
+2. Add stable `key` values to columns
+3. Define column widths where appropriate
+4. Disable resize/reorder for action columns if needed
+5. Provide a reset layout option for complex tables
+
+---
+
+## Recommended Usage
+
+For the best user experience:
+
+- Use a unique `tableEnhancedKey` per table
+- Add stable `key` values to all columns
+- Add `width` values to important columns
+- Disable resize/reorder for action columns
+- Provide a reset layout button for tables with many columns
+
+Example:
+
+```tsx
+<Table
+  tableEnhancedKey="orders-table"
+  rowKey="id"
+  columns={columns}
+  dataSource={data}
+  pagination={{
+    pageSize: 10,
+  }}
+/>
+```
+
+---
+
+## Examples
+
+The live demo includes practical examples for common usage patterns:
+
+- Basic enhanced table
+- Reset layout
+- Disable resize and reorder
+- Per-column controls
+
+View examples here:
+
+**[https://abhijeet-oxide.github.io/antd-table-enhanced/](https://abhijeet-oxide.github.io/antd-table-enhanced/)**
+
+---
+
+## Local Development
+
+Install dependencies:
+
+```bash
+pnpm install
+```
+
+Build the package:
+
+```bash
+pnpm build
+```
+
+Run the demo locally:
+
+```bash
+pnpm demo:dev
+```
+
+Build the demo:
+
+```bash
+pnpm demo:build
+```
+
+Preview the production demo:
+
+```bash
+pnpm demo:preview
+```
+
+---
+
+## GitHub Pages Deployment
+
+The demo is deployed using GitHub Actions.
+
+Workflow:
+
+```txt
+.github/workflows/pages.yml
+```
+
+Demo output:
+
+```txt
+examples/demo/dist
+```
+
+Live URL:
+
+```txt
+https://abhijeet-oxide.github.io/antd-table-enhanced/
+```
+
+To enable GitHub Pages:
+
+1. Open the repository on GitHub
+2. Go to **Settings**
+3. Go to **Pages**
+4. Set **Source** to **GitHub Actions**
+5. Push to the `main` branch
+
+---
+
+## Compatibility
+
+| Package    | Supported Version |
+| ---------- | ----------------- |
+| React      | 18+               |
+| Ant Design | 5.x               |
+| TypeScript | Supported         |
+
+---
+
+## Why Use This Package?
+
+Ant Design provides a powerful table component, but many production applications require additional column interaction capabilities.
+
+`antd-table-enhanced` provides those capabilities while keeping the Ant Design developer experience familiar.
+
+Use it when you need:
+
+- User-adjustable column widths
+- User-controlled column order
+- Persisted table layout preferences
+- A simple migration path from Ant Design `Table`
+- A reusable solution instead of rebuilding column resize/reorder behavior repeatedly
 
 ---
 
