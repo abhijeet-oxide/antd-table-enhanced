@@ -1,67 +1,604 @@
-html,
-body,
-#root {
-  min-height: 100%;
-  margin: 0;
+:root {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+
+  color: rgba(0, 0, 0, 0.88);
+  background: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --header-height: 64px;
+  --docs-sider-width: 220px;
+  --docs-max-width: 1200px;
+  --border-color: #f0f0f0;
+  --text-secondary: rgba(0, 0, 0, 0.65);
+  --text-tertiary: rgba(0, 0, 0, 0.45);
+  --primary-color: #1677ff;
+  --code-bg: #f5f5f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-height) + 24px);
 }
 
 body {
-  background: #f5f5f5;
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-color);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 .app-layout {
   min-height: 100vh;
+  background: #ffffff;
 }
 
-.app-header {
-  height: auto;
-  padding: 24px 32px;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+/* Header */
 
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-height);
+  padding: 0;
+  line-height: normal;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--border-color);
+  backdrop-filter: blur(8px);
+}
+
+.app-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-height);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.brand:hover {
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(135deg, #1677ff 0%, #722ed1 100%);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.24);
+}
+
+.brand-text {
+  overflow: hidden;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-actions {
+  flex: 0 0 auto;
+}
+
+.npm-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* Main content */
+
+.app-content {
+  background: #ffffff;
+}
+
+/* Hero */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(22, 119, 255, 0.12),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(114, 46, 209, 0.1),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+
+.hero::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+
+.hero-content {
+  position: relative;
+  max-width: var(--docs-max-width);
+  margin: 0 auto;
+  padding: 72px 32px 80px;
+}
+
+.hero-tags {
+  margin-bottom: 16px;
+}
+
+.hero-title.ant-typography {
+  margin: 0 0 20px;
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #111111 0%, #1677ff 54%, #722ed1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-description.ant-typography {
+  max-width: 760px;
+  margin-bottom: 32px;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+/* Docs layout */
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: var(--docs-sider-width) minmax(0, 1fr);
+  gap: 40px;
+  max-width: calc(var(--docs-max-width) + var(--docs-sider-width) + 40px);
+  margin: 0 auto;
+  padding: 40px 32px 80px;
+}
+
+.docs-sider {
+  position: relative;
+}
+
+.docs-sider-inner {
+  position: sticky;
+  top: calc(var(--header-height) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(100vh - var(--header-height) - 48px);
+  padding-right: 16px;
+  overflow: auto;
+}
+
+.docs-sider-title {
+  display: block;
+  margin-bottom: 8px;
+  padding: 4px 12px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.docs-sider-inner a {
+  display: block;
+  padding: 7px 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: 6px;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.docs-sider-inner a:hover {
+  color: var(--primary-color);
+  background: rgba(22, 119, 255, 0.06);
+}
+
+.docs-main {
+  min-width: 0;
+  max-width: var(--docs-max-width);
+}
+
+.docs-section {
+  margin-bottom: 40px;
+}
+
+.section-heading {
+  margin-bottom: 20px;
+}
+
+.section-heading .ant-typography {
+  margin-top: 0;
+}
+
+.section-heading p.ant-typography {
+  max-width: 760px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.section-title.ant-typography {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.section-description.ant-typography {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* Install card */
+
+.install-card {
+  border-radius: 10px;
+}
+
+.install-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
 }
 
-.app-title {
-  margin: 0 !important;
+.install-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 8px 8px 12px;
+  background: #fafafa;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
 }
 
-.app-subtitle {
-  color: rgba(0, 0, 0, 0.65);
+.install-command .ant-typography {
+  margin: 0;
+  white-space: nowrap;
 }
 
-.app-content {
-  width: min(1280px, calc(100% - 32px));
-  margin: 24px auto 48px;
+/* Usage */
+
+.usage-card {
+  overflow: hidden;
+  border-radius: 10px;
 }
 
-.hero-card {
-  margin-bottom: 24px;
+.usage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
 }
 
-.demo-section {
-  width: 100%;
+.usage-code {
+  border-top: 1px solid var(--border-color);
 }
 
-.full-width {
-  width: 100%;
+/* Demo cards */
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
 }
 
-.preview {
-  width: 100%;
+.demo-card {
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.demo-preview {
+  padding: 24px;
+  background: #ffffff;
+}
+
+.demo-preview .ant-table-wrapper {
   overflow-x: auto;
 }
+
+.demo-divider {
+  margin: 0;
+}
+
+.demo-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #ffffff;
+}
+
+.demo-meta-content {
+  min-width: 0;
+}
+
+.demo-title.ant-typography {
+  position: relative;
+  display: inline-block;
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.demo-title.ant-typography::before,
+.demo-title.ant-typography::after {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: var(--border-color);
+  content: "";
+}
+
+.demo-title.ant-typography::before {
+  right: calc(100% + 8px);
+}
+
+.demo-title.ant-typography::after {
+  left: calc(100% + 8px);
+}
+
+.demo-description.ant-typography {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.demo-actions {
+  flex: 0 0 auto;
+}
+
+.demo-code {
+  background: var(--code-bg);
+}
+
+/* Code block */
 
 .code-block {
+  max-height: 520px;
   margin: 0;
-  padding: 16px;
-  overflow-x: auto;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #e2e8f0;
+  padding: 20px 24px;
+  overflow: auto;
+  color: rgba(0, 0, 0, 0.88);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
+  background: var(--code-bg);
+  border-radius: 0;
+  tab-size: 2;
+}
+
+.code-block code {
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* Ant Design polish */
+
+.ant-card {
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+
+.ant-card:hover {
+  border-color: #d9d9d9;
+}
+
+.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ant-btn .ant-btn-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ant-tag {
+  margin-inline-end: 0;
+  border-radius: 999px;
+}
+
+/* Tables inside examples */
+
+.demo-preview .ant-table {
+  font-size: 14px;
+}
+
+.demo-preview .ant-table-thead > tr > th {
+  font-weight: 600;
+}
+
+.demo-preview .ant-table-wrapper:not(:last-child) {
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+
+@media (max-width: 992px) {
+  :root {
+    --docs-sider-width: 180px;
+  }
+
+  .docs-layout {
+    gap: 24px;
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .app-header-inner {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .hero-content {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header-inner {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .brand-text {
+    max-width: 180px;
+  }
+
+  .header-actions .ant-btn {
+    padding-inline: 10px;
+  }
+
+  .header-actions .ant-btn span:not(.ant-btn-icon) {
+    display: none;
+  }
+
+  .hero-content {
+    padding: 48px 16px 56px;
+  }
+
+  .hero-description.ant-typography {
+    font-size: 16px;
+  }
+
+  .docs-layout {
+    display: block;
+    padding: 32px 16px 56px;
+  }
+
+  .docs-sider {
+    display: none;
+  }
+
+  .install-content,
+  .usage-header,
+  .demo-meta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .install-command {
+    justify-content: space-between;
+  }
+
+  .demo-actions {
+    justify-content: flex-end;
+  }
+
+  .demo-title.ant-typography::before,
+  .demo-title.ant-typography::after {
+    display: none;
+  }
+
+  .demo-preview {
+    padding: 16px;
+  }
+
+  .demo-meta {
+    padding: 16px;
+  }
+
+  .usage-header {
+    padding: 16px;
+  }
+
+  .code-block {
+    padding: 16px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-text {
+    display: none;
+  }
+
+  .hero-title.ant-typography {
+    font-size: 38px;
+  }
+
+  .install-command {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .install-command .ant-typography {
+    white-space: normal;
+    word-break: break-all;
+  }
 }
