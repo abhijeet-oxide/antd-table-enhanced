@@ -1,7 +1,5 @@
 # antd-table-enhanced
 
-# antd-table-enhanced
-
 [![Publish to NPM](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/publish.yml/badge.svg)](https://github.com/abhijeet-oxide/antd-table-enhanced/actions/workflows/publish.yml)
 [![npm version](https://img.shields.io/npm/v/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
 [![npm downloads](https://img.shields.io/npm/dm/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
