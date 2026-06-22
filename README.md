@@ -1,5 +1,16 @@
 # antd-table-enhanced
 
+# antd-table-enhanced
+
+[![npm version](https://img.shields.io/npm/v/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
+[![npm downloads](https://img.shields.io/npm/dm/antd-table-enhanced.svg)](https://www.npmjs.com/package/antd-table-enhanced)
+[![license](https://img.shields.io/npm/l/antd-table-enhanced.svg)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-ready-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-%3E%3D18-61dafb.svg)](https://react.dev/)
+[![Ant Design](https://img.shields.io/badge/Ant%20Design-5.x-1677ff.svg)](https://ant.design/)
+
+A drop-in enhanced Ant Design Table with resizable, reorderable, and remembered columns.
+
 I’ve been using Ant Design for a long time, and honestly — it’s awesome.
 
 But one thing always bugged me:
