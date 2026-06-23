@@ -1,6 +1,6 @@
-import { Tag, Tooltip } from "antd";
+import { Tag } from "antd";
+import type { TableEnhancedColumns } from "antd-table-enhanced";
 import { Table } from "antd-table-enhanced";
-import type { ColumnsType } from "antd/es/table";
 
 type DemoRow = {
   id: number;
@@ -11,15 +11,7 @@ type DemoRow = {
   notes: string;
 };
 
-function EllipsisCell({ value }: { value: string }) {
-  return (
-    <Tooltip title={value} placement="topLeft">
-      <span className="demo-ellipsis-cell">{value}</span>
-    </Tooltip>
-  );
-}
-
-const columns: ColumnsType<DemoRow> = [
+const columns: TableEnhancedColumns<DemoRow> = [
   {
     title: "Name",
     dataIndex: "name",
@@ -63,7 +55,6 @@ const columns: ColumnsType<DemoRow> = [
     key: "notes",
     width: 320,
     ellipsis: true,
-    render: (value: string) => <EllipsisCell value={value} />,
   },
 ];
 
@@ -120,6 +111,8 @@ export default function BasicExample() {
       <Table<DemoRow>
         tableEnhancedKey="demo-basic-table-with-long-ellipsis-text"
         rowKey="id"
+        allow_export
+        show_column_visibility
         columns={columns}
         dataSource={data}
         pagination={false}

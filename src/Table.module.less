@@ -80,6 +80,165 @@
   }
 }
 
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 0 10px;
+  gap: 8px;
+
+  :global(.ant-btn) {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    border-color: #d9dee8;
+    color: #374151;
+    transition:
+      transform 140ms ease,
+      box-shadow 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      background-color 140ms ease;
+  }
+
+  :global(.ant-btn:hover) {
+    color: var(--antd-table-enhanced-primary) !important;
+    border-color: rgba(22, 119, 255, 0.45) !important;
+    background: #fff !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+
+  :global(.ant-btn:active) {
+    transform: translateY(0);
+  }
+}
+
+.toolbarDropdown {
+  :global(.ant-dropdown-menu) {
+    min-width: 160px !important;
+    padding: 8px !important;
+    border-radius: 14px !important;
+    box-shadow: var(--antd-table-enhanced-menu-shadow) !important;
+    border: 1px solid rgba(229, 231, 235, 0.95);
+  }
+
+  :global(.ant-dropdown-menu-item) {
+    min-height: 36px;
+    border-radius: 9px !important;
+    margin: 2px 0 !important;
+    padding-inline: 10px !important;
+  }
+
+  :global(.ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled):hover) {
+    background: rgba(22, 119, 255, 0.08) !important;
+    color: #0958d9 !important;
+  }
+}
+
+.columnVisibilityOverlay {
+  z-index: 1080;
+}
+
+.columnVisibilityDropdown {
+  width: 310px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(229, 231, 235, 0.96);
+  box-shadow: var(--antd-table-enhanced-menu-shadow);
+}
+
+.columnVisibilityHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.columnVisibilityCount {
+  font-size: 12px;
+}
+
+.columnSearch {
+  margin-bottom: 10px;
+}
+
+.columnVisibilityList {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+  margin: 0 -2px;
+
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #cbd5e1;
+  }
+}
+
+.columnVisibilityItem {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+
+  &:hover {
+    background: rgba(22, 119, 255, 0.07);
+  }
+
+  :global(.ant-checkbox-wrapper),
+  :global(.ant-checkbox) {
+    flex: 0 0 auto;
+  }
+}
+
+.columnVisibilityLabel {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #1f2937;
+}
+
+.columnVisibilityPin {
+  flex: 0 0 auto;
+  color: #8c98aa;
+  font-size: 12px;
+  opacity: 0.78;
+}
+
+.columnVisibilityEmpty {
+  margin: 18px 0;
+}
+
+.columnVisibilityFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 8px;
+  border-top: 1px solid #eef0f4;
+}
+
 .borderedHeader {
   :global(.ant-table-thead > tr > th) {
     border-right: 1px solid var(--antd-table-enhanced-border);
@@ -120,7 +279,7 @@
   max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   position: relative;
 }
 
@@ -136,6 +295,14 @@
 
 .titleHasControls {
   padding-right: 38px;
+}
+
+.pinIndicator {
+  flex: 0 0 auto;
+  color: #8c98aa;
+  font-size: 12px;
+  opacity: 0.75;
+  transform: rotate(-24deg);
 }
 
 .control {
@@ -304,10 +471,10 @@
 
 .preferenceDropdown {
   width: max-content !important;
-  min-width: 230px !important;
+  min-width: 240px !important;
 
   :global(.ant-dropdown-menu) {
-    min-width: 230px !important;
+    min-width: 240px !important;
     padding: 8px !important;
     border-radius: 14px !important;
     box-shadow: var(--antd-table-enhanced-menu-shadow) !important;

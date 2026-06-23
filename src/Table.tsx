@@ -3,15 +3,27 @@
 
 import {
   ColumnWidthOutlined,
+  DownloadOutlined,
   DragOutlined,
+  FileExcelOutlined,
+  FileTextOutlined,
   HolderOutlined,
+  PushpinFilled,
+  PushpinOutlined,
   ReloadOutlined,
+  SearchOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import type { MenuProps, TableProps } from "antd";
 import {
   Table as AntTable,
   Button,
+  Checkbox,
   Dropdown,
+  Empty,
+  Input,
+  message,
+  Space,
   Tag,
   Tooltip,
   Typography,
@@ -23,6 +35,8 @@ import styles from "./Table.module.less";
 
 type AnyRecord = Record<string, any>;
 type DropSide = "left" | "right";
+type PinSide = "left" | "right";
+type PinStateValue = PinSide | null;
 
 const s = styles as Record<string, string>;
 
@@ -33,12 +47,19 @@ function cx(...values: Array<string | false | null | undefined>) {
 export type TableEnhancedState = {
   widths: Record<string, number>;
   order: string[];
+  pinned?: Record<string, PinStateValue>;
+  hidden?: string[];
 };
 
 export type TableEnhancedActions = {
   resetLayout: () => void;
   resetColumnWidth: (columnKey: string) => void;
   resetColumnOrder: () => void;
+  pinColumn: (columnKey: string, side: PinSide) => void;
+  unpinColumn: (columnKey: string) => void;
+  setColumnVisible: (columnKey: string, visible: boolean) => void;
+  autoFitColumn: (columnKey: string) => void;
+  autoFitTable: () => void;
   getState: () => TableEnhancedState;
   setState: (state: TableEnhancedState) => void;
 };
@@ -58,34 +79,57 @@ export type TableEnhancedProps<RecordType extends AnyRecord = AnyRecord> =
   TableProps<RecordType> & {
     tableEnhancedKey?: string;
     tableEnhancedActionsRef?: React.MutableRefObject<TableEnhancedActions | null>;
-
     enableColumnResize?: boolean;
     enableColumnReorder?: boolean;
-
+    allow_export?: boolean;
+    show_column_visibility?: boolean;
     tableEnhancedDebug?: boolean;
     tableEnhancedShowActiveBadge?: boolean;
-
     minColumnWidth?: number;
     defaultColumnWidth?: number;
-
     showColumnControls?: "always" | "hover" | "off";
-
     tableEnhancedDensity?: "comfortable" | "middle" | "compact";
     tableEnhancedBorderedHeader?: boolean;
-
     storage?: Storage;
 
     onTableEnhancedColumnResize?: (columnKey: string, width: number) => void;
     onTableEnhancedColumnReorder?: (order: string[]) => void;
+    onTableEnhancedColumnPin?: (
+      columnKey: string,
+      side: PinSide | null,
+    ) => void;
+    onTableEnhancedColumnVisibilityChange?: (
+      columnKey: string,
+      visible: boolean,
+    ) => void;
   };
 
 const STORAGE_PREFIX = "antd-table-enhanced";
 const STORAGE_WRITE_DEBOUNCE_MS = 240;
+const REORDER_TOOLTIP_CLASS = "antd-table-enhanced-reorder-tooltip";
+
+/**
+ * Keeps AntD Dropdown overlays above Modal, Drawer, Mask, etc.
+ * AntD Modal default z-index is usually 1000.
+ */
+const DROPDOWN_OVERLAY_Z_INDEX = 9999;
+
+function getDefaultDropdownPopupContainer(
+  triggerNode: HTMLElement,
+): HTMLElement {
+  if (!canUseDOM()) return triggerNode;
+
+  return (
+    (triggerNode.closest(
+      '[data-antd-table-enhanced-wrapper="true"]',
+    ) as HTMLElement | null) ??
+    (triggerNode.closest(".ant-modal") as HTMLElement | null) ??
+    document.body
+  );
+}
 
 let activeDragColumnKey: string | null = null;
 let activeDragColumnLabel: string | null = null;
-
-const REORDER_TOOLTIP_CLASS = "antd-table-enhanced-reorder-tooltip";
 
 function canUseDOM() {
   return typeof window !== "undefined" && typeof document !== "undefined";
@@ -129,26 +173,56 @@ function debugWarn(debug?: boolean, ...args: any[]) {
 }
 
 function emptyState(): TableEnhancedState {
-  return { widths: {}, order: [] };
+  return {
+    widths: {},
+    order: [],
+    pinned: {},
+    hidden: [],
+  };
 }
 
 function hasMeaningfulState(state: TableEnhancedState) {
-  return Object.keys(state.widths).length > 0 || state.order.length > 0;
+  return (
+    Object.keys(state.widths ?? {}).length > 0 ||
+    (state.order ?? []).length > 0 ||
+    Object.keys(state.pinned ?? {}).length > 0 ||
+    (state.hidden ?? []).length > 0
+  );
 }
 
 function statesEqual(a: TableEnhancedState, b: TableEnhancedState) {
-  const aWidthKeys = Object.keys(a.widths);
-  const bWidthKeys = Object.keys(b.widths);
+  const aw = a.widths ?? {};
+  const bw = b.widths ?? {};
+  const ap = a.pinned ?? {};
+  const bp = b.pinned ?? {};
+  const ah = a.hidden ?? [];
+  const bh = b.hidden ?? [];
 
-  if (aWidthKeys.length !== bWidthKeys.length) return false;
-  if (a.order.length !== b.order.length) return false;
+  const awKeys = Object.keys(aw);
+  const bwKeys = Object.keys(bw);
+  const apKeys = Object.keys(ap);
+  const bpKeys = Object.keys(bp);
 
-  for (const key of aWidthKeys) {
-    if (a.widths[key] !== b.widths[key]) return false;
+  if (awKeys.length !== bwKeys.length) return false;
+  if ((a.order ?? []).length !== (b.order ?? []).length) return false;
+  if (apKeys.length !== bpKeys.length) return false;
+  if (ah.length !== bh.length) return false;
+
+  for (const key of awKeys) {
+    if (aw[key] !== bw[key]) return false;
   }
 
-  for (let index = 0; index < a.order.length; index += 1) {
-    if (a.order[index] !== b.order[index]) return false;
+  for (let i = 0; i < (a.order ?? []).length; i += 1) {
+    if (a.order[i] !== b.order[i]) return false;
+  }
+
+  for (const key of apKeys) {
+    if (ap[key] !== bp[key]) return false;
+  }
+
+  const ahSet = new Set(ah);
+  for (const key of bh) {
+    if (!ahSet.has(key)) return false;
   }
 
   return true;
@@ -167,30 +241,242 @@ function sanitizePersistedState(
   if (value?.widths && typeof value.widths === "object") {
     Object.entries(value.widths).forEach(([key, rawWidth]) => {
       const width = Number(rawWidth);
-
       if (!Number.isFinite(width) || width <= 0) return;
       if (widthKeySet && !widthKeySet.has(key)) return;
-
       widths[key] = Math.round(width);
     });
   }
 
   const order: string[] = [];
-  const seen = new Set<string>();
+  const seenOrder = new Set<string>();
 
   if (Array.isArray(value?.order)) {
     value.order.forEach((rawKey: unknown) => {
       const key = String(rawKey);
-
-      if (!key || seen.has(key)) return;
+      if (!key || seenOrder.has(key)) return;
       if (orderKeySet && !orderKeySet.has(key)) return;
-
-      seen.add(key);
+      seenOrder.add(key);
       order.push(key);
     });
   }
 
-  return { widths, order };
+  const pinned: Record<string, PinStateValue> = {};
+
+  if (value?.pinned && typeof value.pinned === "object") {
+    Object.entries(value.pinned).forEach(([key, rawSide]) => {
+      if (orderKeySet && !orderKeySet.has(key)) return;
+
+      if (rawSide === "left" || rawSide === "right") {
+        pinned[key] = rawSide;
+        return;
+      }
+
+      if (rawSide === null) {
+        pinned[key] = null;
+      }
+    });
+  }
+
+  const hidden: string[] = [];
+  const seenHidden = new Set<string>();
+
+  if (Array.isArray(value?.hidden)) {
+    value.hidden.forEach((rawKey: unknown) => {
+      const key = String(rawKey);
+      if (!key || seenHidden.has(key)) return;
+      if (orderKeySet && !orderKeySet.has(key)) return;
+      seenHidden.add(key);
+      hidden.push(key);
+    });
+  }
+
+  return {
+    widths,
+    order,
+    pinned,
+    hidden,
+  };
+}
+
+type AutoFitColumnTarget<RecordType> = {
+  key: string;
+  title: string;
+  column: TableEnhancedColumn<RecordType>;
+};
+
+let autoFitMeasureCanvas: HTMLCanvasElement | null = null;
+
+function getAutoFitMeasureContext(): CanvasRenderingContext2D | null {
+  if (!canUseDOM()) return null;
+
+  if (!autoFitMeasureCanvas) {
+    autoFitMeasureCanvas = document.createElement("canvas");
+  }
+
+  return autoFitMeasureCanvas.getContext("2d");
+}
+
+function getCssFont(element?: Element | null) {
+  if (!canUseDOM() || !element) return "14px Arial";
+
+  const computed = window.getComputedStyle(element);
+
+  if (computed.font) return computed.font;
+
+  return [
+    computed.fontStyle,
+    computed.fontVariant,
+    computed.fontWeight,
+    `${computed.fontSize}/${computed.lineHeight}`,
+    computed.fontFamily,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function measurePlainTextWidth(text: string, font: string) {
+  const safeText = String(text ?? "");
+
+  const lines = safeText.split(/\r?\n/g);
+  const context = getAutoFitMeasureContext();
+
+  if (!context) {
+    return Math.max(...lines.map((line) => line.length * 8), 0);
+  }
+
+  context.font = font;
+
+  return Math.max(...lines.map((line) => context.measureText(line).width), 0);
+}
+
+function getAutoFitRenderedCellText<RecordType extends AnyRecord>(
+  column: TableEnhancedColumn<RecordType>,
+  record: RecordType,
+  rowIndex: number,
+) {
+  let rawValue = getNestedValue(record, column.dataIndex);
+
+  if (typeof column.render === "function") {
+    try {
+      const rendered = column.render(rawValue, record, rowIndex) as any;
+
+      rawValue =
+        rendered && typeof rendered === "object" && "children" in rendered
+          ? rendered.children
+          : rendered;
+    } catch {
+      rawValue = getNestedValue(record, column.dataIndex);
+    }
+  }
+
+  return normalizeExportCellValue(rawValue);
+}
+
+function collectAutoFitLeafTargets<RecordType extends AnyRecord>(
+  columns: TableEnhancedColumns<RecordType>,
+  indexPath: number[] = [],
+): AutoFitColumnTarget<RecordType>[] {
+  return columns.flatMap((column, index) => {
+    const currentIndexPath = [...indexPath, index];
+    const columnKey = getColumnKey(column, currentIndexPath);
+
+    if (Array.isArray(column.children) && column.children.length > 0) {
+      return collectAutoFitLeafTargets(
+        column.children as TableEnhancedColumns<RecordType>,
+        currentIndexPath,
+      );
+    }
+
+    const titleNode =
+      typeof column.title === "function" ? undefined : column.title;
+
+    return [
+      {
+        key: columnKey,
+        title: getColumnDisplayLabel(columnKey, titleNode),
+        column,
+      },
+    ];
+  });
+}
+
+function findAutoFitTargetsForColumnKey<RecordType extends AnyRecord>(
+  columns: TableEnhancedColumns<RecordType>,
+  targetColumnKey: string,
+  indexPath: number[] = [],
+): AutoFitColumnTarget<RecordType>[] {
+  for (let index = 0; index < columns.length; index += 1) {
+    const column = columns[index];
+    const currentIndexPath = [...indexPath, index];
+    const columnKey = getColumnKey(column, currentIndexPath);
+
+    const hasChildren =
+      Array.isArray(column.children) && column.children.length > 0;
+
+    if (columnKey === targetColumnKey) {
+      if (hasChildren) {
+        return collectAutoFitLeafTargets(
+          column.children as TableEnhancedColumns<RecordType>,
+          currentIndexPath,
+        );
+      }
+
+      const titleNode =
+        typeof column.title === "function" ? undefined : column.title;
+
+      return [
+        {
+          key: columnKey,
+          title: getColumnDisplayLabel(columnKey, titleNode),
+          column,
+        },
+      ];
+    }
+
+    if (hasChildren) {
+      const childResult = findAutoFitTargetsForColumnKey(
+        column.children as TableEnhancedColumns<RecordType>,
+        targetColumnKey,
+        currentIndexPath,
+      );
+
+      if (childResult.length) return childResult;
+    }
+  }
+
+  return [];
+}
+
+function calculateAutoFitColumnWidth<RecordType extends AnyRecord>(options: {
+  target: AutoFitColumnTarget<RecordType>;
+  dataSource?: readonly RecordType[];
+  wrapperElement?: HTMLElement | null;
+  minColumnWidth: number;
+}) {
+  const { target, dataSource, wrapperElement, minColumnWidth } = options;
+
+  const headerCell = wrapperElement?.querySelector(".ant-table-thead th");
+  const bodyCell = wrapperElement?.querySelector(".ant-table-tbody td");
+
+  const headerFont = getCssFont(headerCell ?? wrapperElement);
+  const bodyFont = getCssFont(bodyCell ?? wrapperElement);
+
+  const rows = Array.isArray(dataSource) ? dataSource : [];
+
+  const headerWidth = measurePlainTextWidth(target.title, headerFont);
+
+  const maxBodyWidth = rows.reduce((maxWidth, record, rowIndex) => {
+    const text = getAutoFitRenderedCellText(target.column, record, rowIndex);
+
+    return Math.max(maxWidth, measurePlainTextWidth(text, bodyFont));
+  }, 0);
+
+  const extraWidth = 56;
+
+  return Math.max(
+    minColumnWidth,
+    Math.ceil(Math.max(headerWidth, maxBodyWidth) + extraWidth),
+  );
 }
 
 function safeReadStorage(
@@ -307,56 +593,6 @@ function getColumnDisplayLabel(
   columnTitle?: React.ReactNode,
 ): string {
   return reactNodeToPlainText(columnTitle)?.trim() || columnKey;
-}
-
-function getDragColumnLabelFromEvent(
-  event: React.DragEvent,
-  fallback?: string,
-): string {
-  return (
-    event.dataTransfer.getData(
-      "application/x-antd-table-enhanced-column-label",
-    ) ||
-    activeDragColumnLabel ||
-    fallback ||
-    "column"
-  );
-}
-
-function buildReorderTooltipText(options: {
-  draggedColumnKey?: string | null;
-  draggedColumnLabel: string;
-  targetColumnKey: string;
-  targetColumnLabel: string;
-  previousColumnKey?: string;
-  previousColumnLabel?: string;
-  side: DropSide;
-}) {
-  const {
-    draggedColumnKey,
-    draggedColumnLabel,
-    targetColumnKey,
-    targetColumnLabel,
-    previousColumnKey,
-    previousColumnLabel,
-    side,
-  } = options;
-
-  const columnBeforeKey =
-    side === "right" ? targetColumnKey : previousColumnKey;
-
-  const columnBeforeLabel =
-    side === "right" ? targetColumnLabel : previousColumnLabel;
-
-  if (
-    columnBeforeLabel &&
-    columnBeforeKey &&
-    columnBeforeKey !== draggedColumnKey
-  ) {
-    return `Place ${draggedColumnLabel} after ${columnBeforeLabel}`;
-  }
-
-  return `Place ${draggedColumnLabel} before ${targetColumnLabel}`;
 }
 
 function getColumnKey<RecordType>(
@@ -540,6 +776,40 @@ function orderColumns<RecordType>(
   return result;
 }
 
+function applyPinnedColumns<RecordType>(
+  columns: TableEnhancedColumns<RecordType>,
+  pinned: Record<string, PinStateValue> = {},
+): TableEnhancedColumns<RecordType> {
+  return columns.map((column, index) => {
+    const columnKey = getColumnKey(column, [index]);
+    const pinValue = pinned[columnKey];
+
+    const nextColumn: TableEnhancedColumn<RecordType> = {
+      ...column,
+    };
+
+    if (pinValue === "left" || pinValue === "right") {
+      nextColumn.fixed = pinValue;
+    } else if (pinValue === null) {
+      delete nextColumn.fixed;
+    }
+
+    return nextColumn;
+  });
+}
+
+function filterHiddenColumns<RecordType>(
+  columns: TableEnhancedColumns<RecordType>,
+  hidden: string[] = [],
+): TableEnhancedColumns<RecordType> {
+  const hiddenSet = new Set(hidden);
+
+  return columns.filter((column, index) => {
+    const columnKey = getColumnKey(column, [index]);
+    return !hiddenSet.has(columnKey);
+  });
+}
+
 function estimateColumnWidth<RecordType>(
   column: TableEnhancedColumn<RecordType>,
   indexPath: number[],
@@ -581,14 +851,55 @@ function estimateScrollX<RecordType>(
   }, 0);
 }
 
-type EnhancedTitleProps = {
-  columnKey: string;
-  columnLabel: string;
-  reorderEnabled: boolean;
-  controlsEnabled: boolean;
-  debug?: boolean;
-  children: React.ReactNode;
-};
+function getDragColumnLabelFromEvent(
+  event: React.DragEvent,
+  fallback?: string,
+): string {
+  return (
+    event.dataTransfer.getData(
+      "application/x-antd-table-enhanced-column-label",
+    ) ||
+    activeDragColumnLabel ||
+    fallback ||
+    "column"
+  );
+}
+
+function buildReorderTooltipText(options: {
+  draggedColumnKey?: string | null;
+  draggedColumnLabel: string;
+  targetColumnKey: string;
+  targetColumnLabel: string;
+  previousColumnKey?: string;
+  previousColumnLabel?: string;
+  side: DropSide;
+}) {
+  const {
+    draggedColumnKey,
+    draggedColumnLabel,
+    targetColumnKey,
+    targetColumnLabel,
+    previousColumnKey,
+    previousColumnLabel,
+    side,
+  } = options;
+
+  const columnBeforeKey =
+    side === "right" ? targetColumnKey : previousColumnKey;
+
+  const columnBeforeLabel =
+    side === "right" ? targetColumnLabel : previousColumnLabel;
+
+  if (
+    columnBeforeLabel &&
+    columnBeforeKey &&
+    columnBeforeKey !== draggedColumnKey
+  ) {
+    return `Place ${draggedColumnLabel} after ${columnBeforeLabel}`;
+  }
+
+  return `Place ${draggedColumnLabel} before ${targetColumnLabel}`;
+}
 
 function removeReorderTooltips() {
   if (!canUseDOM()) return;
@@ -617,6 +928,8 @@ function createReorderTooltip() {
   tooltip.className = cx(REORDER_TOOLTIP_CLASS, s.reorderTooltip);
 
   tooltip.style.position = "fixed";
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
   tooltip.style.zIndex = "99999";
   tooltip.style.pointerEvents = "none";
   tooltip.style.padding = "6px 10px";
@@ -627,7 +940,7 @@ function createReorderTooltip() {
   tooltip.style.lineHeight = "18px";
   tooltip.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.22)";
   tooltip.style.whiteSpace = "nowrap";
-  tooltip.style.transform = "translate(-9999px, -9999px)";
+  tooltip.style.transform = "translate3d(-9999px, -9999px, 0)";
 
   document.body.appendChild(tooltip);
 
@@ -635,20 +948,49 @@ function createReorderTooltip() {
     setText(text: string) {
       tooltip.textContent = text;
     },
+
     setPosition(x: number, y: number) {
-      tooltip.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
+      const offset = 12;
+      const margin = 8;
+
+      const rect = tooltip.getBoundingClientRect();
+
+      let nextX = x + offset;
+      let nextY = y + offset;
+
+      if (nextX + rect.width > window.innerWidth - margin) {
+        nextX = x - rect.width - offset;
+      }
+
+      if (nextY + rect.height > window.innerHeight - margin) {
+        nextY = y - rect.height - offset;
+      }
+
+      tooltip.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
     },
+
     remove() {
       tooltip.remove();
     },
   };
 }
 
+type EnhancedTitleProps = {
+  columnKey: string;
+  columnLabel: string;
+  reorderEnabled: boolean;
+  controlsEnabled: boolean;
+  pinnedSide?: PinSide;
+  debug?: boolean;
+  children: React.ReactNode;
+};
+
 const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
   columnKey,
   columnLabel,
   reorderEnabled,
   controlsEnabled,
+  pinnedSide,
   debug,
   children,
 }) => {
@@ -658,7 +1000,6 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
     if (!showHandle) return;
 
     event.stopPropagation();
-
     removeReorderGuides();
 
     activeDragColumnKey = columnKey;
@@ -697,6 +1038,12 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
       data-antd-table-enhanced-title="true"
       data-antd-table-enhanced-column-key={columnKey}
     >
+      {pinnedSide ? (
+        <Tooltip title={`Pinned to ${pinnedSide}`}>
+          <PushpinFilled className={s.pinIndicator} />
+        </Tooltip>
+      ) : null}
+
       <span className={s.titleText}>{children}</span>
 
       {showHandle ? (
@@ -747,7 +1094,7 @@ type HeaderCellProps = React.ThHTMLAttributes<HTMLTableCellElement> & {
   enhancedDebug?: boolean;
 
   enhancedContextMenuOpen?: boolean;
-  enhancedPreferenceMenuItems?: MenuProps["items"];
+  enhancedGetPopupContainer?: (triggerNode: HTMLElement) => HTMLElement;
 
   enhancedOnContextMenuOpenChange?: (columnKey: string, open: boolean) => void;
 
@@ -825,12 +1172,11 @@ function createHeaderCell(ExistingHeaderCell?: any) {
       enhancedShowColumnControls = "hover",
       enhancedRecentlyMoved,
       enhancedDebug,
-
       enhancedContextMenuOpen,
       enhancedPreferenceMenuItems,
+      enhancedGetPopupContainer,
       enhancedOnContextMenuOpenChange,
       enhancedOnPreferenceMenuClick,
-
       enhancedOnColumnResize,
       enhancedOnColumnDrop,
       enhancedOnHeaderContextMenu,
@@ -1281,10 +1627,14 @@ function createHeaderCell(ExistingHeaderCell?: any) {
         trigger={[]}
         placement="bottomLeft"
         open={Boolean(enhancedContextMenuOpen)}
+        getPopupContainer={
+          enhancedGetPopupContainer ?? getDefaultDropdownPopupContainer
+        }
         overlayClassName={s.preferenceDropdown}
         overlayStyle={{
           width: "max-content",
-          minWidth: 230,
+          minWidth: 240,
+          zIndex: DROPDOWN_OVERLAY_Z_INDEX,
         }}
         onOpenChange={(open) => {
           enhancedOnContextMenuOpenChange(enhancedColumnKey, open);
@@ -1294,7 +1644,7 @@ function createHeaderCell(ExistingHeaderCell?: any) {
           items: enhancedPreferenceMenuItems,
           style: {
             width: "max-content",
-            minWidth: 230,
+            minWidth: 240,
           },
           onClick: ({ key, domEvent }) => {
             domEvent.stopPropagation();
@@ -1327,9 +1677,11 @@ function decorateColumns<RecordType extends AnyRecord>(
     showColumnControls: "always" | "hover" | "off";
     debug?: boolean;
     contextMenu: ContextMenuState;
+    effectivePinned: Record<string, PinSide | undefined>;
     onContextMenuOpenChange: (columnKey: string, open: boolean) => void;
     onPreferenceMenuClick: (columnKey: string, actionKey: string) => void;
     getPreferenceMenuItems: (columnKey: string) => MenuProps["items"];
+    getPopupContainer: (triggerNode: HTMLElement) => HTMLElement;
     onResize: (columnKey: string, width: number) => void;
     onDrop: (
       fromColumnKey: string,
@@ -1351,9 +1703,11 @@ function decorateColumns<RecordType extends AnyRecord>(
     showColumnControls,
     debug,
     contextMenu,
+    effectivePinned,
     onContextMenuOpenChange,
     onPreferenceMenuClick,
     getPreferenceMenuItems,
+    getPopupContainer,
     onResize,
     onDrop,
     onHeaderContextMenu,
@@ -1405,6 +1759,8 @@ function decorateColumns<RecordType extends AnyRecord>(
       typeof originalTitle === "function" ? undefined : originalTitle,
     );
 
+    const pinnedSide = effectivePinned[columnKey];
+
     const renderTitle = (titleProps?: any) => {
       const node =
         typeof originalTitle === "function"
@@ -1417,6 +1773,7 @@ function decorateColumns<RecordType extends AnyRecord>(
           columnLabel={getColumnDisplayLabel(columnKey, node)}
           reorderEnabled={reorderEnabled}
           controlsEnabled={showColumnControls !== "off"}
+          pinnedSide={pinnedSide}
           debug={debug}
         >
           {node}
@@ -1453,6 +1810,7 @@ function decorateColumns<RecordType extends AnyRecord>(
 
           enhancedContextMenuOpen: contextMenu?.columnKey === columnKey,
           enhancedPreferenceMenuItems: getPreferenceMenuItems(columnKey),
+          enhancedGetPopupContainer: getPopupContainer,
           enhancedOnContextMenuOpenChange: onContextMenuOpenChange,
           enhancedOnPreferenceMenuClick: onPreferenceMenuClick,
 
@@ -1485,6 +1843,227 @@ type PendingStorageWrite = {
   debug?: boolean;
 };
 
+function getNestedValue(record: AnyRecord, dataIndex: unknown) {
+  if (dataIndex === undefined || dataIndex === null) return undefined;
+
+  const path = Array.isArray(dataIndex)
+    ? dataIndex
+    : String(dataIndex).split(".");
+
+  return path.reduce((value, key) => {
+    if (value === undefined || value === null) return undefined;
+    return value[key as keyof typeof value];
+  }, record as any);
+}
+
+function normalizeExportCellValue(value: any): string {
+  if (value === undefined || value === null) return "";
+
+  if (React.isValidElement(value)) {
+    return reactNodeToPlainText(value) ?? "";
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+type ExportColumn<RecordType> = {
+  key: string;
+  title: string;
+  column: TableEnhancedColumn<RecordType>;
+};
+
+function collectExportColumns<RecordType extends AnyRecord>(
+  columns: TableEnhancedColumns<RecordType>,
+  indexPath: number[] = [],
+): ExportColumn<RecordType>[] {
+  return columns.flatMap((column, index) => {
+    const currentIndexPath = [...indexPath, index];
+    const columnKey = getColumnKey(column, currentIndexPath);
+
+    if (Array.isArray(column.children) && column.children.length > 0) {
+      return collectExportColumns(
+        column.children as TableEnhancedColumns<RecordType>,
+        currentIndexPath,
+      );
+    }
+
+    const titleNode =
+      typeof column.title === "function" ? undefined : column.title;
+
+    return [
+      {
+        key: columnKey,
+        title: getColumnDisplayLabel(columnKey, titleNode),
+        column,
+      },
+    ];
+  });
+}
+
+function getExportRows<RecordType extends AnyRecord>(
+  dataSource: readonly RecordType[] | undefined,
+  exportColumns: ExportColumn<RecordType>[],
+) {
+  const rows = Array.isArray(dataSource) ? dataSource : [];
+
+  return rows.map((record, rowIndex) => {
+    const row: Record<string, string> = {};
+
+    exportColumns.forEach(({ title, column }) => {
+      let rawValue = getNestedValue(record, column.dataIndex);
+
+      if (typeof column.render === "function") {
+        try {
+          const rendered = column.render(rawValue, record, rowIndex) as any;
+
+          rawValue =
+            rendered && typeof rendered === "object" && "children" in rendered
+              ? rendered.children
+              : rendered;
+        } catch {
+          rawValue = getNestedValue(record, column.dataIndex);
+        }
+      }
+
+      row[title] = normalizeExportCellValue(rawValue);
+    });
+
+    return row;
+  });
+}
+
+function csvEscape(value: string) {
+  const safe = value ?? "";
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
+
+function downloadBlob(content: BlobPart, fileName: string, type: string) {
+  if (!canUseDOM()) return;
+
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.style.display = "none";
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
+
+function exportToCsv<RecordType extends AnyRecord>(
+  rows: Record<string, string>[],
+  exportColumns: ExportColumn<RecordType>[],
+  fileName: string,
+) {
+  const headers = exportColumns.map((column) => column.title);
+  const content = [
+    headers.map(csvEscape).join(","),
+    ...rows.map((row) =>
+      headers.map((header) => csvEscape(row[header])).join(","),
+    ),
+  ].join("\n");
+
+  downloadBlob(
+    `\uFEFF${content}`,
+    `${fileName}.csv`,
+    "text/csv;charset=utf-8;",
+  );
+}
+
+function htmlEscape(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function exportToExcel<RecordType extends AnyRecord>(
+  rows: Record<string, string>[],
+  exportColumns: ExportColumn<RecordType>[],
+  fileName: string,
+) {
+  const headers = exportColumns.map((column) => column.title);
+
+  const tableHtml = `
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>${headers.map((header) => `<th>${htmlEscape(header)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) =>
+                  `<tr>${headers
+                    .map((header) => `<td>${htmlEscape(row[header])}</td>`)
+                    .join("")}</tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  downloadBlob(
+    tableHtml,
+    `${fileName}.xls`,
+    "application/vnd.ms-excel;charset=utf-8;",
+  );
+}
+
+function exportToJson(rows: Record<string, string>[], fileName: string) {
+  downloadBlob(
+    JSON.stringify(rows, null, 2),
+    `${fileName}.json`,
+    "application/json;charset=utf-8;",
+  );
+}
+
+function getExportFileName(tableEnhancedKey?: string) {
+  const date = new Date().toISOString().slice(0, 10);
+  const safeKey = tableEnhancedKey
+    ? tableEnhancedKey.replace(/[^\w.-]+/g, "_")
+    : "table";
+
+  return `${safeKey}_${date}`;
+}
+
+type ToolbarColumnItem = {
+  key: string;
+  label: string;
+  pinned?: PinSide;
+  visible: boolean;
+};
+
 function InnerTable<RecordType extends AnyRecord = AnyRecord>(
   props: TableEnhancedProps<RecordType>,
   ref: React.Ref<any>,
@@ -1496,6 +2075,8 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     tableEnhancedActionsRef,
     enableColumnResize = true,
     enableColumnReorder = true,
+    allow_export = false,
+    show_column_visibility = false,
     tableEnhancedDebug = false,
     tableEnhancedShowActiveBadge = false,
     minColumnWidth = 90,
@@ -1508,17 +2089,18 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     tableLayout,
     scroll,
     className,
+    dataSource,
     onTableEnhancedColumnResize,
     onTableEnhancedColumnReorder,
+    onTableEnhancedColumnPin,
+    onTableEnhancedColumnVisibilityChange,
     ...restProps
   } = props;
 
   const debug = isDebugEnabled(tableEnhancedDebug);
 
   useIsomorphicLayoutEffect(() => {
-    // Intentionally empty.
-    // Styles are provided by importing the package CSS:
-    // import "antd-table-enhanced/style.css";
+    // Styles are supplied via Table.module.less.
   }, []);
 
   const storageKey = React.useMemo(() => {
@@ -1540,10 +2122,30 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
   );
 
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState>(null);
+  const [columnVisibilityOpen, setColumnVisibilityOpen] = React.useState(false);
+  const [columnSearch, setColumnSearch] = React.useState("");
+  const [exportOpen, setExportOpen] = React.useState(false);
+  const [exportingType, setExportingType] = React.useState<
+    "csv" | "excel" | "json" | null
+  >(null);
+
+  const searchInputRef = React.useRef<any>(null);
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     persistedRef.current = persisted;
   }, [persisted]);
+
+  React.useEffect(() => {
+    if (!columnVisibilityOpen) return;
+
+    const timer = window.setTimeout(() => {
+      searchInputRef.current?.focus?.();
+      searchInputRef.current?.select?.();
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [columnVisibilityOpen]);
 
   const flushPendingStorageWrite = React.useCallback(() => {
     if (storageWriteTimerRef.current && canUseDOM()) {
@@ -1604,19 +2206,19 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     [columns],
   );
 
-  const fixedNormalizedColumns = React.useMemo(
+  const originalNormalizedColumns = React.useMemo(
     () => normalizeFixedColumnPlacement(originalColumns),
     [originalColumns],
   );
 
   const topLevelColumnKeys = React.useMemo(
-    () => getTopLevelColumnKeys(fixedNormalizedColumns),
-    [fixedNormalizedColumns],
+    () => getTopLevelColumnKeys(originalNormalizedColumns),
+    [originalNormalizedColumns],
   );
 
   const allColumnKeys = React.useMemo(
-    () => getAllColumnKeys(fixedNormalizedColumns),
-    [fixedNormalizedColumns],
+    () => getAllColumnKeys(originalNormalizedColumns),
+    [originalNormalizedColumns],
   );
 
   React.useEffect(() => {
@@ -1633,6 +2235,8 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     setPersisted(sanitized);
     setRecentlyMovedKeys([]);
     setContextMenu(null);
+    setColumnVisibilityOpen(false);
+    setExportOpen(false);
   }, [
     storageKey,
     storage,
@@ -1658,44 +2262,6 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     });
   }, [allColumnKeys, topLevelColumnKeys, scheduleStorageWrite]);
 
-  React.useEffect(() => {
-    debugLog(debug, "Rendered", {
-      tableEnhancedKey,
-      storageKey,
-      columnCount: originalColumns.length,
-      columnKeys: getTopLevelColumnKeys(originalColumns),
-      fixedNormalizedColumnKeys: getTopLevelColumnKeys(fixedNormalizedColumns),
-    });
-  }, [
-    debug,
-    tableEnhancedKey,
-    storageKey,
-    originalColumns,
-    fixedNormalizedColumns,
-  ]);
-
-  React.useEffect(() => {
-    if (!contextMenu || !canUseDOM()) return;
-
-    const close = () => setContextMenu(null);
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-
-    window.addEventListener("click", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [contextMenu]);
-
   const updatePersisted = React.useCallback(
     (
       updater: (current: TableEnhancedState) => TableEnhancedState,
@@ -1718,6 +2284,44 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     },
     [allColumnKeys, topLevelColumnKeys, scheduleStorageWrite],
   );
+
+  const pinnedAppliedColumns = React.useMemo(() => {
+    return applyPinnedColumns(
+      originalNormalizedColumns,
+      persisted.pinned ?? {},
+    );
+  }, [originalNormalizedColumns, persisted.pinned]);
+
+  const fixedNormalizedColumns = React.useMemo(() => {
+    return normalizeFixedColumnPlacement(pinnedAppliedColumns);
+  }, [pinnedAppliedColumns]);
+
+  const orderedColumns = React.useMemo(() => {
+    return orderColumns(fixedNormalizedColumns, persisted.order, debug);
+  }, [fixedNormalizedColumns, persisted.order, debug]);
+
+  const visibleOrderedColumns = React.useMemo(() => {
+    return filterHiddenColumns(orderedColumns, persisted.hidden ?? []);
+  }, [orderedColumns, persisted.hidden]);
+
+  const effectivePinned = React.useMemo(() => {
+    const result: Record<string, PinSide | undefined> = {};
+
+    orderedColumns.forEach((column, index) => {
+      const key = getColumnKey(column, [index]);
+
+      if (column.fixed === true || column.fixed === "left") {
+        result[key] = "left";
+      } else if (column.fixed === "right") {
+        result[key] = "right";
+      }
+    });
+
+    return result;
+  }, [orderedColumns]);
+
+  const hasCustomOrder = persisted.order.length > 0;
+  const hasAnyPreference = hasMeaningfulState(persisted);
 
   const resetLayout = React.useCallback(() => {
     if (!hasMeaningfulState(persistedRef.current)) {
@@ -1784,6 +2388,144 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     debugLog(debug, "Column order reset");
   }, [updatePersisted, debug, onTableEnhancedColumnReorder]);
 
+  const pinColumn = React.useCallback(
+    (columnKey: string, side: PinSide) => {
+      updatePersisted((current) => ({
+        ...current,
+        pinned: {
+          ...(current.pinned ?? {}),
+          [columnKey]: side,
+        },
+      }));
+
+      setRecentlyMovedKeys([columnKey]);
+      setContextMenu(null);
+      onTableEnhancedColumnPin?.(columnKey, side);
+
+      if (canUseDOM()) {
+        window.setTimeout(() => setRecentlyMovedKeys([]), 650);
+      }
+    },
+    [updatePersisted, onTableEnhancedColumnPin],
+  );
+
+  const unpinColumn = React.useCallback(
+    (columnKey: string) => {
+      updatePersisted((current) => ({
+        ...current,
+        pinned: {
+          ...(current.pinned ?? {}),
+          [columnKey]: null,
+        },
+      }));
+
+      setRecentlyMovedKeys([columnKey]);
+      setContextMenu(null);
+      onTableEnhancedColumnPin?.(columnKey, null);
+
+      if (canUseDOM()) {
+        window.setTimeout(() => setRecentlyMovedKeys([]), 650);
+      }
+    },
+    [updatePersisted, onTableEnhancedColumnPin],
+  );
+
+  const setColumnVisible = React.useCallback(
+    (columnKey: string, visible: boolean) => {
+      updatePersisted((current) => {
+        const hiddenSet = new Set(current.hidden ?? []);
+
+        if (visible) {
+          hiddenSet.delete(columnKey);
+        } else {
+          hiddenSet.add(columnKey);
+        }
+
+        return {
+          ...current,
+          hidden: Array.from(hiddenSet),
+        };
+      });
+
+      onTableEnhancedColumnVisibilityChange?.(columnKey, visible);
+    },
+    [updatePersisted, onTableEnhancedColumnVisibilityChange],
+  );
+
+  const applyAutoFitTargets = React.useCallback(
+    (
+      targets: AutoFitColumnTarget<RecordType>[],
+      options?: {
+        successMessage?: string;
+      },
+    ) => {
+      const uniqueTargets = Array.from(
+        new Map(targets.map((target) => [target.key, target])).values(),
+      );
+
+      if (!uniqueTargets.length) {
+        message.warning("No visible columns available to autofit.");
+        setContextMenu(null);
+        return;
+      }
+
+      const nextWidths: Record<string, number> = {};
+
+      uniqueTargets.forEach((target) => {
+        nextWidths[target.key] = calculateAutoFitColumnWidth({
+          target,
+          dataSource: dataSource as readonly RecordType[] | undefined,
+          wrapperElement: wrapperRef.current,
+          minColumnWidth,
+        });
+      });
+
+      updatePersisted((current) => ({
+        ...current,
+        widths: {
+          ...current.widths,
+          ...nextWidths,
+        },
+      }));
+
+      Object.entries(nextWidths).forEach(([columnKey, width]) => {
+        onTableEnhancedColumnResize?.(columnKey, width);
+      });
+
+      setContextMenu(null);
+
+      message.success(
+        options?.successMessage ??
+          `Autofitted ${uniqueTargets.length} column${
+            uniqueTargets.length === 1 ? "" : "s"
+          }.`,
+      );
+    },
+    [dataSource, minColumnWidth, updatePersisted, onTableEnhancedColumnResize],
+  );
+
+  const autoFitColumn = React.useCallback(
+    (columnKey: string) => {
+      const targets = findAutoFitTargetsForColumnKey(
+        visibleOrderedColumns,
+        columnKey,
+      );
+
+      applyAutoFitTargets(targets, {
+        successMessage: "Column autofitted.",
+      });
+    },
+    [visibleOrderedColumns, applyAutoFitTargets],
+  );
+
+  const autoFitTable = React.useCallback(() => {
+    const targets = collectAutoFitLeafTargets(visibleOrderedColumns);
+
+    applyAutoFitTargets(targets, {
+      successMessage: "Table autofitted.",
+    });
+  }, [visibleOrderedColumns, applyAutoFitTargets]);
+
   React.useEffect(() => {
     if (!tableEnhancedActionsRef) return;
 
@@ -1791,6 +2533,11 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
       resetLayout,
       resetColumnWidth,
       resetColumnOrder,
+      pinColumn,
+      unpinColumn,
+      setColumnVisible,
+      autoFitColumn,
+      autoFitTable,
       getState: () => persistedRef.current,
       setState: (state: TableEnhancedState) => {
         const next = sanitizePersistedState(
@@ -1813,6 +2560,11 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     resetLayout,
     resetColumnWidth,
     resetColumnOrder,
+    pinColumn,
+    unpinColumn,
+    setColumnVisible,
+    autoFitColumn,
+    autoFitTable,
     allColumnKeys,
     topLevelColumnKeys,
     scheduleStorageWrite,
@@ -1944,8 +2696,27 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     [],
   );
 
-  const hasCustomOrder = persisted.order.length > 0;
-  const hasAnyPreference = hasMeaningfulState(persisted);
+  React.useEffect(() => {
+    if (!contextMenu || !canUseDOM()) return;
+
+    const close = () => setContextMenu(null);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+
+    window.addEventListener("click", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   const getPreferenceMenuItems = React.useCallback(
     (columnKey: string): MenuProps["items"] => {
@@ -1954,7 +2725,47 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
         columnKey,
       );
 
+      const pinnedSide = effectivePinned[columnKey];
+
+      const pinItems: MenuProps["items"] = pinnedSide
+        ? [
+            {
+              key: "unpin-column",
+              icon: <PushpinOutlined />,
+              label: "Unpin Column",
+            },
+          ]
+        : [
+            {
+              key: "pin-left",
+              icon: <PushpinOutlined rotate={-45} />,
+              label: "Pin to left",
+            },
+            {
+              key: "pin-right",
+              icon: <PushpinOutlined rotate={45} />,
+              label: "Pin to right",
+            },
+          ];
+
       return [
+        ...pinItems,
+        {
+          type: "divider",
+        },
+        {
+          key: "autofit-column",
+          icon: <ColumnWidthOutlined />,
+          label: "Autofit Column",
+        },
+        {
+          key: "autofit-table",
+          icon: <ColumnWidthOutlined />,
+          label: "Autofit Table",
+        },
+        {
+          type: "divider",
+        },
         {
           key: "reset-width",
           icon: <ColumnWidthOutlined />,
@@ -1979,11 +2790,35 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
         },
       ];
     },
-    [persisted.widths, hasCustomOrder, hasAnyPreference],
+    [persisted.widths, effectivePinned, hasCustomOrder, hasAnyPreference],
   );
 
   const handlePreferenceMenuClick = React.useCallback(
     (columnKey: string, actionKey: string) => {
+      if (actionKey === "pin-left") {
+        pinColumn(columnKey, "left");
+        return;
+      }
+
+      if (actionKey === "pin-right") {
+        pinColumn(columnKey, "right");
+        return;
+      }
+
+      if (actionKey === "unpin-column") {
+        unpinColumn(columnKey);
+        return;
+      }
+      if (actionKey === "autofit-column") {
+        autoFitColumn(columnKey);
+        return;
+      }
+
+      if (actionKey === "autofit-table") {
+        autoFitTable();
+        return;
+      }
+
       if (actionKey === "reset-width") {
         const columnHasSavedWidth = Object.prototype.hasOwnProperty.call(
           persistedRef.current.widths,
@@ -2009,19 +2844,32 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
         resetLayout();
       }
     },
-    [resetColumnWidth, resetColumnOrder, resetLayout],
+    [
+      pinColumn,
+      unpinColumn,
+      autoFitColumn,
+      autoFitTable,
+      resetColumnWidth,
+      resetColumnOrder,
+      resetLayout,
+    ],
+  );
+
+  const getDropdownPopupContainer = React.useCallback(
+    (triggerNode: HTMLElement) => {
+      if (!canUseDOM()) return triggerNode;
+
+      return (
+        wrapperRef.current ?? getDefaultDropdownPopupContainer(triggerNode)
+      );
+    },
+    [],
   );
 
   const finalColumns = React.useMemo(() => {
     if (!columns) return columns;
 
-    const orderedColumns = orderColumns(
-      fixedNormalizedColumns,
-      persisted.order,
-      debug,
-    );
-
-    return decorateColumns(orderedColumns, {
+    return decorateColumns(visibleOrderedColumns, {
       widths: persisted.widths,
       recentlyMovedKeys,
       enableColumnResize,
@@ -2031,18 +2879,19 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
       showColumnControls,
       debug,
       contextMenu,
+      effectivePinned,
       onContextMenuOpenChange: handleContextMenuOpenChange,
       onPreferenceMenuClick: handlePreferenceMenuClick,
       getPreferenceMenuItems,
+      getPopupContainer: getDropdownPopupContainer,
       onResize: handleResize,
       onDrop: handleDrop,
       onHeaderContextMenu: handleHeaderContextMenu,
     }) as ColumnsType<RecordType>;
   }, [
     columns,
-    fixedNormalizedColumns,
+    visibleOrderedColumns,
     persisted.widths,
-    persisted.order,
     recentlyMovedKeys,
     enableColumnResize,
     enableColumnReorder,
@@ -2051,6 +2900,7 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     showColumnControls,
     debug,
     contextMenu,
+    effectivePinned,
     handleContextMenuOpenChange,
     handlePreferenceMenuClick,
     getPreferenceMenuItems,
@@ -2074,13 +2924,13 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
   const estimatedX = React.useMemo(() => {
     return Math.max(
       estimateScrollX(
-        fixedNormalizedColumns,
+        visibleOrderedColumns,
         persisted.widths,
         defaultColumnWidth,
       ),
       1,
     );
-  }, [fixedNormalizedColumns, persisted.widths, defaultColumnWidth]);
+  }, [visibleOrderedColumns, persisted.widths, defaultColumnWidth]);
 
   const finalScroll = React.useMemo(() => {
     if (scroll) {
@@ -2095,6 +2945,189 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     };
   }, [scroll, estimatedX]);
 
+  const toolbarColumns = React.useMemo<ToolbarColumnItem[]>(() => {
+    const hiddenSet = new Set(persisted.hidden ?? []);
+
+    return orderedColumns.map((column, index) => {
+      const key = getColumnKey(column, [index]);
+      const titleNode =
+        typeof column.title === "function" ? undefined : column.title;
+
+      return {
+        key,
+        label: getColumnDisplayLabel(key, titleNode),
+        pinned: effectivePinned[key],
+        visible: !hiddenSet.has(key),
+      };
+    });
+  }, [orderedColumns, persisted.hidden, effectivePinned]);
+
+  const visibleCount = toolbarColumns.filter((column) => column.visible).length;
+
+  const filteredToolbarColumns = React.useMemo(() => {
+    const q = columnSearch.trim().toLowerCase();
+
+    if (!q) return toolbarColumns;
+
+    return toolbarColumns.filter((column) =>
+      column.label.toLowerCase().includes(q),
+    );
+  }, [toolbarColumns, columnSearch]);
+
+  const exportColumns = React.useMemo(() => {
+    return collectExportColumns(visibleOrderedColumns);
+  }, [visibleOrderedColumns]);
+
+  const handleExport = React.useCallback(
+    async (type: "csv" | "excel" | "json") => {
+      if (!allow_export) return;
+
+      setExportingType(type);
+
+      try {
+        await new Promise((resolve) => window.setTimeout(resolve, 120));
+
+        const rows = getExportRows(
+          dataSource as readonly RecordType[],
+          exportColumns,
+        );
+        const fileName = getExportFileName(tableEnhancedKey);
+
+        if (!exportColumns.length) {
+          message.warning("No visible columns available to export.");
+          return;
+        }
+
+        if (type === "csv") {
+          exportToCsv(rows, exportColumns, fileName);
+        }
+
+        if (type === "excel") {
+          exportToExcel(rows, exportColumns, fileName);
+        }
+
+        if (type === "json") {
+          exportToJson(rows, fileName);
+        }
+
+        message.success("Export completed.");
+        setExportOpen(false);
+      } catch (error) {
+        debugWarn(debug, "Export failed", error);
+        message.error("Export failed. Please try again.");
+      } finally {
+        setExportingType(null);
+      }
+    },
+    [allow_export, dataSource, exportColumns, tableEnhancedKey, debug],
+  );
+
+  const exportMenuItems: MenuProps["items"] = [
+    {
+      key: "csv",
+      icon: <FileTextOutlined />,
+      label: "CSV",
+      disabled: Boolean(exportingType),
+    },
+    {
+      key: "excel",
+      icon: <FileExcelOutlined />,
+      label: "Excel",
+      disabled: Boolean(exportingType),
+    },
+    {
+      key: "json",
+      icon: <FileTextOutlined />,
+      label: "JSON",
+      disabled: Boolean(exportingType),
+    },
+  ];
+
+  const columnVisibilityDropdown = (
+    <div
+      className={s.columnVisibilityDropdown}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className={s.columnVisibilityHeader}>
+        <Typography.Text strong>Columns</Typography.Text>
+        <Typography.Text type="secondary" className={s.columnVisibilityCount}>
+          {visibleCount}/{toolbarColumns.length} visible
+        </Typography.Text>
+      </div>
+
+      <Input
+        ref={searchInputRef}
+        allowClear
+        size="middle"
+        prefix={<SearchOutlined />}
+        placeholder="Search columns"
+        value={columnSearch}
+        onChange={(event) => setColumnSearch(event.target.value)}
+        className={s.columnSearch}
+      />
+
+      <div className={s.columnVisibilityList}>
+        {filteredToolbarColumns.length ? (
+          filteredToolbarColumns.map((column) => {
+            const disableUncheck = column.visible && visibleCount <= 1;
+
+            return (
+              <label key={column.key} className={s.columnVisibilityItem}>
+                <Checkbox
+                  checked={column.visible}
+                  disabled={disableUncheck}
+                  onChange={(event) =>
+                    setColumnVisible(column.key, event.target.checked)
+                  }
+                />
+
+                <span className={s.columnVisibilityLabel}>{column.label}</span>
+
+                {column.pinned ? (
+                  <Tooltip title={`Pinned to ${column.pinned}`}>
+                    <PushpinFilled className={s.columnVisibilityPin} />
+                  </Tooltip>
+                ) : null}
+              </label>
+            );
+          })
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No columns found"
+            className={s.columnVisibilityEmpty}
+          />
+        )}
+      </div>
+
+      <div className={s.columnVisibilityFooter}>
+        <Button
+          size="small"
+          type="link"
+          disabled={!persisted.hidden?.length}
+          onClick={() => {
+            updatePersisted((current) => ({
+              ...current,
+              hidden: [],
+            }));
+          }}
+        >
+          Show all
+        </Button>
+
+        <Button
+          size="small"
+          onClick={() => {
+            setColumnSearch("");
+            setColumnVisibilityOpen(false);
+          }}
+        >
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+
   const wrapperClassName = cx(
     s.wrapper,
     tableEnhancedDensity === "compact" && s.densityCompact,
@@ -2104,8 +3137,11 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     tableEnhancedBorderedHeader && s.borderedHeader,
   );
 
+  const showToolbar = allow_export || show_column_visibility;
+
   return (
     <div
+      ref={wrapperRef}
       className={wrapperClassName}
       data-antd-table-enhanced-wrapper="true"
       data-antd-table-enhanced-key={tableEnhancedKey || storageKey}
@@ -2133,10 +3169,68 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
         </div>
       ) : null}
 
+      {showToolbar ? (
+        <div className={s.toolbar}>
+          <Space size={8}>
+            {allow_export ? (
+              <Dropdown
+                trigger={["click"]}
+                open={exportOpen}
+                onOpenChange={setExportOpen}
+                overlayClassName={s.toolbarDropdown}
+                overlayStyle={{
+                  zIndex: DROPDOWN_OVERLAY_Z_INDEX,
+                }}
+                menu={{
+                  items: exportMenuItems,
+                  onClick: ({ key }) => {
+                    handleExport(String(key) as "csv" | "excel" | "json");
+                  },
+                }}
+              >
+                <Tooltip title="Export table">
+                  <Button
+                    shape="circle"
+                    icon={<DownloadOutlined />}
+                    loading={Boolean(exportingType)}
+                    aria-label="Export table"
+                  />
+                </Tooltip>
+              </Dropdown>
+            ) : null}
+
+            {show_column_visibility ? (
+              <Dropdown
+                trigger={["click"]}
+                open={columnVisibilityOpen}
+                onOpenChange={(open) => {
+                  setColumnVisibilityOpen(open);
+                  if (open) setColumnSearch("");
+                }}
+                overlayClassName={s.columnVisibilityOverlay}
+                overlayStyle={{
+                  zIndex: DROPDOWN_OVERLAY_Z_INDEX,
+                }}
+                dropdownRender={() => columnVisibilityDropdown}
+              >
+                <Tooltip title="Column visibility">
+                  <Button
+                    shape="circle"
+                    icon={<SettingOutlined />}
+                    aria-label="Column visibility"
+                  />
+                </Tooltip>
+              </Dropdown>
+            ) : null}
+          </Space>
+        </div>
+      ) : null}
+
       <AntTable<RecordType>
         ref={ref}
         {...restProps}
         className={className}
+        dataSource={dataSource}
         rowKey={rowKey}
         columns={finalColumns}
         components={mergedComponents}
