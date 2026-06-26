@@ -14,6 +14,12 @@
     border-radius: var(--antd-table-enhanced-radius);
   }
 
+  // AntD sets overflow-x: scroll when scroll.x is defined; override to auto
+  // so the scrollbar only appears when content genuinely overflows.
+  :global(.ant-table-content) {
+    overflow-x: auto !important;
+  }
+
   :global(.ant-table-thead > tr > th) {
     background: var(--antd-table-enhanced-header-bg);
     transition:
@@ -25,7 +31,7 @@
   :global(
     .ant-table-thead > tr > th[data-antd-table-enhanced-header-cell="true"]
   ) {
-    overflow: visible;
+    overflow: visible !important;
   }
 
   :global(.ant-table-thead > tr > th.ant-table-cell-fix-left),
@@ -47,11 +53,19 @@
     z-index: 2;
   }
 
+  :global(.ant-table-thead > tr > th.ant-table-cell-fix-right-first),
+  :global(.ant-table-tbody > tr > td.ant-table-cell-fix-right-first) {
+    box-shadow: -1px 0 0 var(--antd-table-enhanced-border) !important;
+  }
+
   :global(.ant-table-column-title),
-  :global(.ant-table-column-sorters .ant-table-column-title),
-  :global(.ant-table-filter-column-title) {
+  :global(.ant-table-column-sorters .ant-table-column-title) {
     min-width: 0;
     overflow: hidden;
+  }
+
+  :global(.ant-table-filter-column-title) {
+    min-width: 0;
   }
 
   :global(.ant-table-column-sorters),
@@ -293,10 +307,6 @@
   line-height: 1.35;
 }
 
-.titleHasControls {
-  padding-right: 38px;
-}
-
 .pinIndicator {
   flex: 0 0 auto;
   color: #8c98aa;
@@ -332,12 +342,9 @@
 }
 
 .dragButton {
+  flex: 0 0 auto;
+
   &:global(.ant-btn) {
-    position: absolute;
-    top: 50%;
-    right: 15px;
-    transform: translateY(-50%);
-    z-index: 7;
     cursor: grab;
     color: #6b7280;
   }
@@ -345,12 +352,12 @@
   &:global(.ant-btn:hover) {
     color: var(--antd-table-enhanced-primary) !important;
     background: var(--antd-table-enhanced-primary-soft) !important;
-    transform: translateY(-50%) scale(1.04);
+    transform: scale(1.04);
   }
 
   &:global(.ant-btn:active) {
     cursor: grabbing;
-    transform: translateY(-50%) scale(0.98);
+    transform: scale(0.98);
   }
 }
 

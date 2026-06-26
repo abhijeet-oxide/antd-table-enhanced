@@ -118,14 +118,8 @@ function getDefaultDropdownPopupContainer(
   triggerNode: HTMLElement,
 ): HTMLElement {
   if (!canUseDOM()) return triggerNode;
-
-  return (
-    (triggerNode.closest(
-      '[data-antd-table-enhanced-wrapper="true"]',
-    ) as HTMLElement | null) ??
-    (triggerNode.closest(".ant-modal") as HTMLElement | null) ??
-    document.body
-  );
+  // Render in body to escape any parent stacking context / overflow:hidden.
+  return document.body;
 }
 
 let activeDragColumnKey: string | null = null;
@@ -810,47 +804,6 @@ function filterHiddenColumns<RecordType>(
   });
 }
 
-function estimateColumnWidth<RecordType>(
-  column: TableEnhancedColumn<RecordType>,
-  indexPath: number[],
-  widths: Record<string, number>,
-  defaultColumnWidth: number,
-): number {
-  const key = getColumnKey(column, indexPath);
-  const savedWidth = widths[key];
-  const ownWidth = numericWidth(column.width);
-
-  if (Array.isArray(column.children) && column.children.length > 0) {
-    const childrenWidth = column.children.reduce((sum, child, childIndex) => {
-      return (
-        sum +
-        estimateColumnWidth(
-          child,
-          [...indexPath, childIndex],
-          widths,
-          defaultColumnWidth,
-        )
-      );
-    }, 0);
-
-    return savedWidth ?? ownWidth ?? childrenWidth;
-  }
-
-  return savedWidth ?? ownWidth ?? defaultColumnWidth;
-}
-
-function estimateScrollX<RecordType>(
-  columns: TableEnhancedColumns<RecordType>,
-  widths: Record<string, number>,
-  defaultColumnWidth: number,
-) {
-  return columns.reduce((sum, column, index) => {
-    return (
-      sum + estimateColumnWidth(column, [index], widths, defaultColumnWidth)
-    );
-  }, 0);
-}
-
 function getDragColumnLabelFromEvent(
   event: React.DragEvent,
   fallback?: string,
@@ -1033,8 +986,7 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
 
   return (
     <span
-      className={cx(s.titleRoot, showHandle && s.titleHasControls)}
-      title={typeof children === "string" ? children : undefined}
+      className={s.titleRoot}
       data-antd-table-enhanced-title="true"
       data-antd-table-enhanced-column-key={columnKey}
     >
@@ -1044,7 +996,12 @@ const EnhancedTitle: React.FC<EnhancedTitleProps> = ({
         </Tooltip>
       ) : null}
 
-      <span className={s.titleText}>{children}</span>
+      <span
+        className={s.titleText}
+        title={typeof children === "string" ? children : undefined}
+      >
+        {children}
+      </span>
 
       {showHandle ? (
         <Tooltip title="Drag column" mouseEnterDelay={0.45}>
@@ -1094,6 +1051,7 @@ type HeaderCellProps = React.ThHTMLAttributes<HTMLTableCellElement> & {
   enhancedDebug?: boolean;
 
   enhancedContextMenuOpen?: boolean;
+  enhancedPreferenceMenuItems?: MenuProps["items"];
   enhancedGetPopupContainer?: (triggerNode: HTMLElement) => HTMLElement;
 
   enhancedOnContextMenuOpenChange?: (columnKey: string, open: boolean) => void;
@@ -2858,10 +2816,8 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
   const getDropdownPopupContainer = React.useCallback(
     (triggerNode: HTMLElement) => {
       if (!canUseDOM()) return triggerNode;
-
-      return (
-        wrapperRef.current ?? getDefaultDropdownPopupContainer(triggerNode)
-      );
+      // Always use body to avoid stacking-context / overflow:hidden traps.
+      return document.body;
     },
     [],
   );
@@ -2904,6 +2860,7 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     handleContextMenuOpenChange,
     handlePreferenceMenuClick,
     getPreferenceMenuItems,
+    getDropdownPopupContainer,
     handleResize,
     handleDrop,
     handleHeaderContextMenu,
@@ -2921,29 +2878,18 @@ function InnerTable<RecordType extends AnyRecord = AnyRecord>(
     };
   }, [components]);
 
-  const estimatedX = React.useMemo(() => {
-    return Math.max(
-      estimateScrollX(
-        visibleOrderedColumns,
-        persisted.widths,
-        defaultColumnWidth,
-      ),
-      1,
-    );
-  }, [visibleOrderedColumns, persisted.widths, defaultColumnWidth]);
-
   const finalScroll = React.useMemo(() => {
     if (scroll) {
       return {
         ...scroll,
-        x: scroll.x ?? estimatedX,
+        x: scroll.x ?? "max-content",
       };
     }
 
     return {
-      x: estimatedX,
+      x: "max-content",
     };
-  }, [scroll, estimatedX]);
+  }, [scroll]);
 
   const toolbarColumns = React.useMemo<ToolbarColumnItem[]>(() => {
     const hiddenSet = new Set(persisted.hidden ?? []);
