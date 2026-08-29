@@ -1259,6 +1259,35 @@ pnpm demo:preview
 
 ---
 
+## Vendoring it instead of installing it
+
+Some consumers copy `src/` in rather than adding the dependency. That is a
+supported way to use this package and worth knowing about, because it changes
+what "the same code" means.
+
+Today the `configer` and `softwareGateway` tools carry it as `src/tablekit/`,
+beside the design system they already share byte-for-byte, for the reasons a
+copied folder is sometimes better than an installed one: no version skew between
+two applications that must look identical, no install step, and no registry to
+be unreachable from an air-gapped build.
+
+Two changes are made on the way in, and both are the vendor's business rather
+than this package's:
+
+- **The icons are redrawn inline.** This package takes `@ant-design/icons` as a
+  peer dependency; a vendored copy cannot, because the two tools sharing it do
+  not share an icon library. The eleven glyphs are drawn as inline SVG instead.
+- **The colours become design tokens.** This package ships hardcoded blues and
+  greys, which is right for something that must work with no design system
+  underneath it, and wrong inside one - a hardcoded `#fafafa` header is a white
+  band across a dark page. The vendored stylesheet names `var(--brand)`,
+  `var(--surface-2)` and the rest, so the table follows the host's theme.
+
+A fix that belongs to the COMPONENT rather than to a host platform should land
+here first and be copied down, so a vendored copy stays a copy.
+
+---
+
 ## GitHub Pages Deployment
 
 The demo is deployed using GitHub Actions.
